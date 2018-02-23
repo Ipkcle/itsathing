@@ -1,0 +1,224 @@
+use ggez::{Context, GameResult};
+use ggez::graphics::{Mesh, Point2, Vector2};
+use ggez::graphics;
+use ggez::event::*;
+use ggez::timer;
+use ggez::error::GameError;
+use assets::Assets;
+use game_object::Object;
+use behavior::Behavior;
+
+enum Action {
+    None,
+    Item,
+}
+
+struct Input {
+    pub action: Action,
+    up: bool,
+    down: bool,
+    left: bool,
+    right: bool,
+    pub x_axis: f32,
+    pub y_axis: f32,
+}
+
+impl Input {
+    pub fn new() -> Self {
+        Self {
+            action: Action::None,
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            x_axis: 0.0,
+            y_axis: 0.0,
+        }
+    }
+}
+
+pub struct MainState {
+    screen_w: u32,
+    screen_h: u32,
+    input: Input,
+    assets: Assets,
+    player: Player,
+    objects: Vec<Object>,
+    camera: Vector2,
+}
+
+impl MainState {
+    pub fn new(ctx: &mut Context, screen_w: u32, screen_h: u32) -> GameResult<MainState> {
+        let state = MainState {
+            screen_w,
+            screen_h,
+            input: Input::new(),
+            assets: Assets::new(ctx),
+            player: Object::player(),
+            camera: Vector2::new(0.0, 0.0),
+            objects: Vec::new(),
+        };
+        Ok(state)
+    }
+
+    fn handle_player_input(&mut self) {
+        match (self.input.up, self.input.down) {
+            (true, false) => {
+                self.input.y_axis = 1.0;
+            }
+            (false, true) => {
+                self.input.y_axis = -1.0;
+            }
+            _ => {
+                self.input.y_axis = 0.0;
+            }
+        }
+        match (self.input.left, self.input.right) {
+            (true, false) => {
+                self.input.x_axis = -1.0;
+            }
+            (false, true) => {
+                self.input.x_axis = 1.0;
+            }
+            _ => {
+                self.input.x_axis = 0.0;
+            }
+        }
+        player.set_acceleration(Vector2::new(
+            self.input.x_axis * walk_acceleration,
+            self.input.y_axis * walk_acceleration,
+        ))
+        if let Behavior::Player { walk_acceleration } = self.player.behavior {
+            if let Some(ref mut physics) = *self.player.get_mut_physics() {
+            };
+        };
+    }
+
+    fn calculate_physics(&mut self, dt: f32) {
+        if let Some(ref mut physics) = *self.player.get_mut_physics() {
+            physics.step(dt);
+        }
+        self.player.update_position(dt);
+        for object in &mut self.objects {
+            if let Some(ref mut physics) = *object.get_mut_physics() {
+                physics.step(dt);
+            }
+            object.update_position(dt);
+        }
+    }
+
+    fn world_to_screen_coords(&self, point: Point2) -> Point2 {
+        let width = self.screen_w as f32;
+        let height = self.screen_h as f32;
+        let x = point.x + self.camera.x + width / 2.0;
+        let y = height - (point.y + self.camera.y + height / 2.0);
+        Point2::new(x, y)
+    }
+
+    fn is_on_screen(&self, point: Point2) -> bool {
+        (point.x >= 0.0 && point.x <= self.screen_w as f32 && point.y > 0.0
+            && point.y < self.screen_h as f32)
+    }
+
+    fn draw_object(&self, ctx: &mut Context, object: &Object) -> GameResult<()> {
+        //Find the pixel position on screen of the object.
+        let pos = self.world_to_screen_coords(object.position);
+
+        //If the object is not on screen, do nothing.
+        if !self.is_on_screen(pos) {
+            return Ok(());
+        }
+
+        //Draw the renderable component if the object has one, else return an error.
+        if let Some(m) = *object.get_mesh() {
+            //get the mesh from assets
+            let mesh = self.assets.get_mesh(m);
+
+            //Set the drawing parameters.
+            let drawparams = graphics::DrawParam {
+                dest: pos,
+                ..Default::default()
+            };
+
+            //Actually draw to the context.
+            graphics::draw_ex(ctx, mesh, drawparams)
+        } else {
+            Err(GameError::RenderError(String::from(
+                "Tried to render entity with no renderable component",
+            )))
+        }
+    }
+}
+
+impl EventHandler for MainState {
+    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        const DESIRED_FPS: u32 = 60;
+        while timer::check_update_time(ctx, DESIRED_FPS) {
+            let seconds = 1.0 / (DESIRED_FPS as f32);
+            self.handle_player_input();
+            self.calculate_physics(seconds);
+        }
+        Ok(())
+    }
+
+    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+        //clear the context
+        graphics::clear(ctx);
+
+        //draw the player
+        if let Err(error) = self.draw_object(ctx, &self.player) {
+            return Err(error);
+        }
+        //draw objects with renderable component
+        for ref object in &self.objects {
+            if let Some(..) = *object.get_mesh() {
+                if let Err(error) = self.draw_object(ctx, object) {
+                    return Err(error);
+                }
+            }
+        }
+        //show context on screen
+        graphics::present(ctx);
+
+        //yeild cpu when not active
+        timer::yield_now();
+        Ok(())
+    }
+
+    fn key_down_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
+        match keycode {
+            Keycode::W => {
+                self.input.up = true;
+            }
+            Keycode::S => {
+                self.input.down = true;
+            }
+            Keycode::A => {
+                self.input.left = true;
+            }
+            Keycode::D => {
+                self.input.right = true;
+            }
+            Keycode::Escape => ctx.quit().unwrap(),
+            _ => (), // Do nothing
+        }
+    }
+
+    fn key_up_event(&mut self, _ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
+        match keycode {
+            Keycode::W => {
+                self.input.up = false;
+            }
+            Keycode::S => {
+                self.input.down = false;
+            }
+            Keycode::A => {
+                self.input.left = false;
+            }
+            Keycode::D => {
+                self.input.right = false;
+            }
+            _ => (), // Do nothing
+        }
+    }
+}

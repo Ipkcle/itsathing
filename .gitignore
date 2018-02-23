@@ -1,0 +1,8 @@
+/target/
+**/*.rs.bk
+*.dll
+**/*.dll
+/gnu-mingw/
+/msvc/
+notes
+colors.txt
