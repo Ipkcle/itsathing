@@ -21,8 +21,10 @@ struct Input {
     down: bool,
     left: bool,
     right: bool,
+    pub shoot_direction: Vector2,
     pub x_axis: f32,
     pub y_axis: f32,
+    pub shooting: bool,
 }
 
 impl Input {
@@ -33,8 +35,10 @@ impl Input {
             down: false,
             left: false,
             right: false,
+            shoot_direction: Vector2::new(0.0, 0.0),
             x_axis: 0.0,
             y_axis: 0.0,
+            shooting: false,
         }
     }
 }
@@ -44,7 +48,9 @@ pub struct MainState {
     screen_h: u32,
     input: Input,
     assets: Assets,
-    player: Mob,
+    player_mob: Mob,
+//  player_gun: 
+    mobs: Vec<Mob>,
     blocks: Vec<Block>,
     projectiles: Vec<Projectile>,
     camera: Vector2,
@@ -57,17 +63,16 @@ impl MainState {
             screen_h,
             input: Input::new(),
             assets: Assets::new(ctx),
-            player: Mob::player(),
+            player_mob: Mob::player(),
+            mobs: Vec::new(),
             blocks: Vec::new(),
             projectiles: Vec::new(),
             camera: Vector2::new(0.0, 0.0),
         };
+        state.mobs.push(Mob::dummy(Point2::new(100.0, 100.0)));
+        state.mobs.push(Mob::dummy(Point2::new(100.0, -100.0)));
+        state.mobs.push(Mob::dummy(Point2::new(-100.0, -100.0)));
         state.blocks.push(Block::new(10.0, 10.0));
-        state.projectiles.push(Projectile::bullet(
-            Point2::new(-10.0, 10.0),
-            Vector2::new(-100.0, 100.0),
-            Color::new(0.9, 0.9, 0.9, 1.0),
-        ));
         Ok(state)
     }
 
@@ -94,25 +99,70 @@ impl MainState {
                 self.input.x_axis = 0.0;
             }
         }
-        self.player
+        self.player_mob
             .set_movement(Vector2::new(self.input.x_axis, self.input.y_axis));
+        self.player_mob.set_shoot_direction(self.input.shoot_direction);
+        if self.input.shooting {
+            match self.player_mob.shoot() {
+                Some(projectile) => self.projectiles.push(projectile),
+                None => (),
+            }
+        }
     }
 
-    fn calculate_physics(&mut self, dt: f32) {
-        self.player.step(dt);
+    fn calculate_step(&mut self, dt: f32) {
+        self.player_mob.step(dt);
+        for object in &mut self.mobs {
+            object.step(dt);
+        }
         for object in &mut self.blocks {
             object.step(dt);
         }
         for object in &mut self.projectiles {
             object.step(dt);
         }
+    }
+
+    fn clear_objects(&mut self) {
         self.projectiles.retain(|ref projectile| !projectile.should_delete());
+        self.mobs.retain(|ref mob| !mob.should_delete());
+    }
+
+    fn calculate_ai(&mut self) {
+        for object in &mut self.mobs {
+            object.set_target(self.player_mob.get_position());
+        }
     }
 
     fn calculate_collsions(&mut self, dt: f32) {
         for block in self.blocks.iter_mut() {
-            let player_event = collision::create_collision_event(&mut self.player, block);
-            self.player.recieve_event(dt, player_event);
+            for mob in self.mobs.iter_mut() {
+                let event = collision::create_collision_event(mob, block);
+                mob.recieve_event(dt, event);
+            }
+            let player_event = collision::create_collision_event(&mut self.player_mob, block);
+            self.player_mob.recieve_event(dt, player_event);
+        }
+
+        for projectile in self.projectiles.iter_mut() {
+            for mob in self.mobs.iter_mut() {
+                if !projectile.get_whitelist().iter().any(|x| *x == mob.get_id()) {
+                    if collision::is_intersecting(projectile, mob) {
+                        for event in projectile.get_effects() {
+                            mob.recieve_event(dt, event);
+                        }
+                        projectile.mark_for_deletion();
+                    }
+                }
+            }
+            if collision::is_intersecting(projectile, &self.player_mob) {
+                if !projectile.get_whitelist().iter().any(|x| *x == 1i32) {
+                    for event in projectile.get_effects() {
+                        self.player_mob.recieve_event(dt, event);
+                    }
+                    projectile.mark_for_deletion();
+                }
+            }
         }
     }
 
@@ -166,21 +216,31 @@ impl EventHandler for MainState {
         while timer::check_update_time(ctx, DESIRED_FPS) {
             let seconds = 1.0 / (DESIRED_FPS as f32);
             self.handle_player_input();
-            self.calculate_physics(seconds);
+            self.calculate_step(seconds);
             self.calculate_collsions(seconds);
+            self.calculate_ai();
+            self.clear_objects();
         }
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        //clear the context
+        //clear the contexfalse
         graphics::clear(ctx);
 
         //draw the player
-        if let Err(error) = self.draw_object(ctx, &self.player) {
+        if let Err(error) = self.draw_object(ctx, &self.player_mob) {
             return Err(error);
         }
         //draw objects with renderable component
+        for object in &self.mobs {
+            if let Some(..) = object.get_drawable_asset() {
+                if let Err(error) = self.draw_object(ctx, object) {
+                    return Err(error);
+                }
+            }
+        }
+
         for object in &self.blocks {
             if let Some(..) = object.get_drawable_asset() {
                 if let Err(error) = self.draw_object(ctx, object) {
@@ -219,6 +279,22 @@ impl EventHandler for MainState {
             Keycode::D => {
                 self.input.right = true;
             }
+            Keycode::Up => {
+                self.input.shoot_direction = Vector2::new(0.0, 1.0);
+                self.input.shooting = true;
+            }
+            Keycode::Down => {
+                self.input.shoot_direction = Vector2::new(0.0, -1.0);
+                self.input.shooting = true;
+            }
+            Keycode::Left => {
+                self.input.shoot_direction = Vector2::new(-1.0, 0.0);
+                self.input.shooting = true;
+            }
+            Keycode::Right => {
+                self.input.shoot_direction = Vector2::new(1.0, 0.0);
+                self.input.shooting = true;
+            }
             Keycode::Escape => ctx.quit().unwrap(),
             _ => (), // Do nothing
         }
@@ -237,6 +313,18 @@ impl EventHandler for MainState {
             }
             Keycode::D => {
                 self.input.right = false;
+            }
+            Keycode::Up => {
+                self.input.shooting = false;
+            }
+            Keycode::Down => {
+                self.input.shooting = false;
+            }
+            Keycode::Left => {
+                self.input.shooting = false;
+            }
+            Keycode::Right => {
+                self.input.shooting = false;
             }
             _ => (), // Do nothing
         }

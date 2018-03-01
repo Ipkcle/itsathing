@@ -22,6 +22,7 @@ pub struct ActorPhysics {
     velocity: Vector2,
     acceleration: Vector2,
     drag: Drag,
+    facing: Vector2,
 }
 
 impl ActorPhysics {
@@ -30,7 +31,12 @@ impl ActorPhysics {
             velocity: Vector2::new(0.0, 0.0),
             acceleration: Vector2::new(0.0, 0.0),
             drag: Drag::new(drag_constant),
+            facing: Vector2::new(0.0, 0.0),
         }
+    }
+
+    pub fn get_facing(&self) -> Vector2 {
+        self.facing
     }
 
     pub fn get_velocity(&self) -> Vector2 {
@@ -59,8 +65,15 @@ impl ActorPhysics {
         // if self.velocity.norm() < 0.001 { self.velocity = Vector2::zeros(); };
     }
 
+    fn calculate_facing(&mut self) {
+        if self.velocity.norm() != 0.0 {
+            self.facing = self.velocity.normalize();
+        }
+    }
+
     pub fn step(&mut self, dt: f32) {
         self.calculate_drag_acceleration();
         self.calculate_velocity(dt);
+        self.calculate_facing();
     }
 }

@@ -27,6 +27,14 @@ pub trait Object {
     fn step(&mut self, _dt: f32) {
         //do nothing
     }
+
+    fn should_delete(&self) -> bool {
+        false
+    }
+
+    fn get_id(&self) -> i32 {
+        0
+    }
 }
 
 pub struct Block {
@@ -85,12 +93,14 @@ pub struct Projectile {
     max_lifetime: f32,
     effects: Vec<Event>,
     color: Color,
+    whitelist: Vec<i32>,
 }
 
 impl Projectile {
-    pub fn bullet(position: Point2, velocity: Vector2, color: Color) -> Self {
+    pub fn bullet(position: Point2, velocity: Vector2, color: Color, whitelist: Vec<i32>) -> Self {
         let mut effects = Vec::new();
         effects.push(Event::Damage(1));
+        effects.push(Event::Impulse(1000.0 * velocity.normalize()));
         let mut bullet = Self {
             hitbox: Hitbox::new(Vector2::new(2.0, 2.0)),
             mesh: DrawableAsset::Bullet,
@@ -100,6 +110,7 @@ impl Projectile {
             max_lifetime: 1.0,
             effects,
             color,
+            whitelist,
         };
         bullet.physics.set_velocity(velocity);
         bullet
@@ -111,16 +122,24 @@ impl Projectile {
         }
     }
 
-    pub fn get_effects(&self) -> Vec<Event> {
-        self.effects.clone()
+    pub fn get_whitelist(&self) -> Vec<i32> {
+        self.whitelist.clone()
     }
 
-    pub fn should_delete(&self) -> bool {
-        self.lifetime >= self.max_lifetime
+    pub fn mark_for_deletion(&mut self) {
+        self.lifetime += 1000.0;
+    }
+
+    pub fn get_effects(&self) -> Vec<Event> {
+        self.effects.clone()
     }
 }
 
 impl Object for Projectile {
+    fn should_delete(&self) -> bool {
+        self.lifetime >= self.max_lifetime
+    }
+
     fn get_hitbox(&self) -> Option<&Hitbox> {
         Some(&self.hitbox)
     }
@@ -151,6 +170,12 @@ pub struct Mob {
     physics: ActorPhysics,
     position: Point2,
     health: i32,
+    time_since_hurt: f32,
+    time_since_shot: f32,
+    id: i32,
+    color: Color,
+    target: Option<Point2>,
+    shoot_direction: Vector2,
 }
 
 impl Mob {
@@ -173,7 +198,30 @@ impl Mob {
             hitbox: Hitbox::new(Vector2::new(10.0, 10.0)),
             physics: ActorPhysics::new(drag_constant),
             position: Point2::new(0.0, 0.0),
-            health: 1,
+            health: 5,
+            time_since_hurt: 300.0,
+            time_since_shot: 300.0,
+            id: 1,
+            color: Color::new(0.3, 0.7, 0.7, 0.7),
+            target: None,
+            shoot_direction: Vector2::new(0.0, 0.0),
+        }
+    }
+
+    pub fn dummy(position: Point2) -> Self {
+        Self {
+            walk_acceleration: 1000.0,
+            mesh: DrawableAsset::Player,
+            hitbox: Hitbox::new(Vector2::new(10.0, 10.0)),
+            physics: ActorPhysics::new(10.0),
+            position,
+            health: 3,
+            time_since_hurt: 300.0,
+            time_since_shot: 300.0,
+            id: 0,
+            color: Color::from((222, 184, 135, 200)),
+            target: Some(Point2::new(0.0, 0.0)),
+            shoot_direction: Vector2::new(0.0, 0.0),
         }
     }
 
@@ -181,6 +229,29 @@ impl Mob {
         if self.physics.get_velocity().norm() > 10.0 {
             self.position += self.physics.get_velocity() * dt;
         }
+    }
+
+    pub fn shoot(&mut self) -> Option<Projectile> {
+        if self.time_since_shot >= 0.2 {
+            self.time_since_shot = 0.0;
+            Some(Projectile::bullet(
+                self.position + 0.5 * self.hitbox.vec(),
+                500.0 * self.shoot_direction.normalize(),
+                Color::new(0.9, 0.9, 0.9, 1.0),
+                vec![self.get_id()],
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn set_shoot_direction(&mut self, direction: Vector2) {
+        self.shoot_direction = direction;
+    }
+
+    pub fn set_target(&mut self, target: Point2) {
+        self.target = Some(target);
+        self.shoot_direction = target - self.position;
     }
 
     pub fn set_movement(&mut self, direction: Vector2) {
@@ -194,6 +265,9 @@ impl Mob {
 }
 
 impl Object for Mob {
+    fn get_id(&self) -> i32 {
+        self.id
+    }
     fn get_hitbox(&self) -> Option<&Hitbox> {
         Some(&self.hitbox)
     }
@@ -209,10 +283,28 @@ impl Object for Mob {
     fn step(&mut self, dt: f32) {
         self.physics.step(dt);
         self.update_position(dt);
+        if let Some(t) = self.target {
+            let pos = self.position;
+            self.set_movement(t - pos);
+        }
+        if self.time_since_hurt < 200.0 {
+            self.time_since_hurt += dt;
+        }
+        if self.time_since_shot < 200.0 {
+            self.time_since_shot += dt;
+        }
     }
 
     fn get_color(&self) -> Option<Color> {
-        Some(Color::new(0.3, 0.7, 0.7, 0.7))
+        if self.time_since_hurt < 0.15 {
+            Some(Color::new(0.9, 0.4, 0.4, 0.7))
+        } else {
+            Some(self.color)
+        }
+    }
+
+    fn should_delete(&self) -> bool {
+        self.health <= 0
     }
 
     fn recieve_event(&mut self, _dt: f32, event: Event) {
@@ -227,8 +319,11 @@ impl Object for Mob {
                 }
                 self.physics.set_velocity(v);
             }
-            Event::Damage(damage) => {self.health -= damage},
-            Event::Impulse(vector) => {self.physics.add_impulse(vector)}
+            Event::Damage(damage) => {
+                self.health -= damage;
+                self.time_since_hurt = 0.0
+            }
+            Event::Impulse(vector) => self.physics.add_impulse(vector),
             _ => (),
         }
     }
@@ -251,10 +346,10 @@ pub mod collision {
         }
     }
 
-    pub fn is_intersecting<T: Object, U: Object>(
+    fn get_hitbox_distances<T: Object, U: Object>(
         object_1: &T,
-        object_2: &T,
-    ) -> bool {
+        object_2: &U,
+    ) -> Option<(f32, f32, f32, f32)> {
         if let (Some(hitbox_1), Some(hitbox_2)) = (object_1.get_hitbox(), object_2.get_hitbox()) {
             let (position_1, position_2) = (object_1.get_position(), object_2.get_position());
             let h1 = position_1 + hitbox_1.vec();
@@ -266,6 +361,18 @@ pub mod collision {
             let dy1 = h2.y - position_1.y;
             let dy2 = h1.y - position_2.y;
 
+            Some((dx1, dx2, dy1, dy2))
+        } else {
+            None
+        }
+    }
+
+    pub fn get_distance<T: Object, U: Object>(object_1: &T, object_2: &U) -> f32 {
+        (object_1.get_position() - object_2.get_position()).norm()
+    }
+
+    pub fn is_intersecting<T: Object, U: Object>(object_1: &T, object_2: &U) -> bool {
+        if let Some((dx1, dx2, dy1, dy2)) = get_hitbox_distances(object_1, object_2) {
             (dx1 > 0.0) & (dx2 > 0.0) & (dy1 > 0.0) & (dy2 > 0.0)
         } else {
             false
