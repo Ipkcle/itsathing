@@ -7,6 +7,7 @@ use ggez::timer;
 use ggez::error::GameError;
 use assets::Assets;
 use game_object::{Block, Mob, Object, Projectile};
+use ggez::graphics::Drawable;
 use game_object::event::Event;
 use game_object::collision;
 
@@ -49,7 +50,7 @@ pub struct MainState {
     input: Input,
     assets: Assets,
     player_mob: Mob,
-//  player_gun: 
+    //  player_gun:
     mobs: Vec<Mob>,
     blocks: Vec<Block>,
     projectiles: Vec<Projectile>,
@@ -101,7 +102,8 @@ impl MainState {
         }
         self.player_mob
             .set_movement(Vector2::new(self.input.x_axis, self.input.y_axis));
-        self.player_mob.set_shoot_direction(self.input.shoot_direction);
+        self.player_mob
+            .set_shoot_direction(self.input.shoot_direction);
         if self.input.shooting {
             match self.player_mob.shoot() {
                 Some(projectile) => self.projectiles.push(projectile),
@@ -124,7 +126,8 @@ impl MainState {
     }
 
     fn clear_objects(&mut self) {
-        self.projectiles.retain(|ref projectile| !projectile.should_delete());
+        self.projectiles
+            .retain(|ref projectile| !projectile.should_delete());
         self.mobs.retain(|ref mob| !mob.should_delete());
     }
 
@@ -135,48 +138,46 @@ impl MainState {
     }
 
     fn calculate_collsions(&mut self, dt: f32) {
+        //TODO clean this up
         for block in self.blocks.iter_mut() {
             for mob in self.mobs.iter_mut() {
-                let event = collision::create_collision_event(mob, block);
-                mob.recieve_event(dt, event);
+                let events = block.create_collision_event(mob);
+                mob.recieve_events(dt, events);
             }
-            let player_event = collision::create_collision_event(&mut self.player_mob, block);
-            self.player_mob.recieve_event(dt, player_event);
+            let player_events = block.create_collision_event(&self.player_mob);
+            self.player_mob.recieve_events(dt, player_events);
         }
 
         for projectile in self.projectiles.iter_mut() {
             for mob in self.mobs.iter_mut() {
-                if !projectile.get_whitelist().iter().any(|x| *x == mob.get_id()) {
-                    if collision::is_intersecting(projectile, mob) {
-                        for event in projectile.get_effects() {
-                            mob.recieve_event(dt, event);
-                        }
-                        projectile.mark_for_deletion();
-                    }
-                }
+                let events = projectile.create_collision_event(mob);
+                mob.recieve_events(dt, events);
             }
-            if collision::is_intersecting(projectile, &self.player_mob) {
-                if !projectile.get_whitelist().iter().any(|x| *x == 1i32) {
-                    for event in projectile.get_effects() {
-                        self.player_mob.recieve_event(dt, event);
-                    }
-                    projectile.mark_for_deletion();
-                }
-            }
+            let events = projectile.create_collision_event(&self.player_mob);
+            self.player_mob.recieve_events(dt, events);
         }
     }
 
     fn world_to_screen_coords(&self, point: Point2) -> Point2 {
         let width = self.screen_w as f32;
         let height = self.screen_h as f32;
-        let x = point.x + self.camera.x + width / 2.0;
-        let y = height - (point.y + self.camera.y + height / 2.0);
+        let x = point.x + -1.0 * self.camera.x + width / 2.0;
+        let y = height - (point.y + -1.0 * self.camera.y + height / 2.0);
         Point2::new(x, y)
     }
 
     fn is_on_screen(&self, point: Point2) -> bool {
         (point.x >= 0.0 && point.x <= self.screen_w as f32 && point.y > 0.0
             && point.y < self.screen_h as f32)
+    }
+
+    fn update_camera(&mut self) {
+        let (x, y) = (
+            self.player_mob.get_position().x,
+            self.player_mob.get_position().y,
+        );
+        self.camera.x = x;
+        self.camera.y = y;
     }
 
     fn draw_object<T: Object>(&self, ctx: &mut Context, object: &T) -> GameResult<()> {
@@ -220,13 +221,29 @@ impl EventHandler for MainState {
             self.calculate_collsions(seconds);
             self.calculate_ai();
             self.clear_objects();
+            self.update_camera();
         }
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        //clear the contexfalse
+        //clear the contex
         graphics::clear(ctx);
+
+        //awful fps display
+        /*
+        let fps = &timer::get_fps(ctx).to_string();
+        graphics::Text::new(ctx, fps, &graphics::Font::default_font().unwrap())
+            .unwrap()
+            .draw_ex(
+                ctx,
+                graphics::DrawParam {
+                    dest: Point2::new(0.0, 0.0),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            */
 
         //draw the player
         if let Err(error) = self.draw_object(ctx, &self.player_mob) {

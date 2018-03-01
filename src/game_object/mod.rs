@@ -7,8 +7,22 @@ use self::collision::Hitbox;
 use self::event::Event;
 use assets::DrawableAsset;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ObjectID{ value: u32 }
+
+impl ObjectID {
+    pub fn new(value: u32) -> ObjectID {
+        ObjectID { value }
+    }
+    pub fn v(&self) -> u32 {
+        self.value
+    }
+}
+
 pub trait Object {
-    fn get_drawable_asset(&self) -> Option<DrawableAsset>;
+    fn get_drawable_asset(&self) -> Option<DrawableAsset> {
+        None
+    }
 
     fn get_color(&self) -> Option<Color> {
         None
@@ -18,10 +32,20 @@ pub trait Object {
         None
     }
 
+    fn create_collision_event<T: Object>(&mut self, _object: &T) -> Vec<Event> {
+        Vec::new()
+    }
+
     fn get_position(&self) -> Point2;
 
     fn recieve_event(&mut self, _dt: f32, _event: Event) {
         //do nothing
+    }
+
+    fn recieve_events(&mut self, dt: f32, events: Vec<Event>) {
+        for event in events {
+            self.recieve_event(dt, event);
+        }
     }
 
     fn step(&mut self, _dt: f32) {
@@ -32,8 +56,8 @@ pub trait Object {
         false
     }
 
-    fn get_id(&self) -> i32 {
-        0
+    fn get_id(&self) -> ObjectID {
+        ObjectID::new(0)
     }
 }
 
@@ -41,7 +65,6 @@ pub struct Block {
     mesh: DrawableAsset,
     position: Point2,
     hitbox: Hitbox,
-    is_colliding: bool,
 }
 
 impl Block {
@@ -50,7 +73,6 @@ impl Block {
             mesh: DrawableAsset::Block,
             position: Point2::new(x, y),
             hitbox: Hitbox::new(Vector2::new(20.0, 30.0)),
-            is_colliding: false,
         }
     }
 }
@@ -68,19 +90,15 @@ impl Object for Block {
         self.position
     }
 
-    fn recieve_event(&mut self, _dt: f32, event: Event) {
-        self.is_colliding = match event {
-            Event::Collision { .. } => true,
-            Event::NoCollision => false,
-            _ => self.is_colliding,
-        }
+    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
+        vec![Event::Collision {
+            penetration: collision::find_penetration(object, self),
+            elasticity: 0.0,
+        }]
     }
 
     fn get_color(&self) -> Option<Color> {
-        Some(match self.is_colliding {
-            true => Color::new(0.7, 0.3, 0.3, 0.7),
-            false => Color::new(0.3, 0.7, 0.3, 0.7),
-        })
+        Some(Color::new(0.3, 0.7, 0.3, 0.7))
     }
 }
 
@@ -93,14 +111,14 @@ pub struct Projectile {
     max_lifetime: f32,
     effects: Vec<Event>,
     color: Color,
-    whitelist: Vec<i32>,
+    whitelist: Vec<ObjectID>,
 }
 
 impl Projectile {
-    pub fn bullet(position: Point2, velocity: Vector2, color: Color, whitelist: Vec<i32>) -> Self {
+    pub fn bullet(position: Point2, velocity: Vector2, color: Color, whitelist: Vec<ObjectID>) -> Self {
         let mut effects = Vec::new();
         effects.push(Event::Damage(1));
-        effects.push(Event::Impulse(1000.0 * velocity.normalize()));
+        effects.push(Event::Impulse(400.0 * velocity.normalize()));
         let mut bullet = Self {
             hitbox: Hitbox::new(Vector2::new(2.0, 2.0)),
             mesh: DrawableAsset::Bullet,
@@ -122,7 +140,7 @@ impl Projectile {
         }
     }
 
-    pub fn get_whitelist(&self) -> Vec<i32> {
+    pub fn get_whitelist(&self) -> Vec<ObjectID> {
         self.whitelist.clone()
     }
 
@@ -130,12 +148,25 @@ impl Projectile {
         self.lifetime += 1000.0;
     }
 
-    pub fn get_effects(&self) -> Vec<Event> {
+    fn get_effects(&self) -> Vec<Event> {
         self.effects.clone()
     }
 }
 
 impl Object for Projectile {
+    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
+        if collision::is_intersecting(self, object) {
+        if !self.get_whitelist().iter().any(|x| *x == object.get_id()) {
+                self.mark_for_deletion();
+                self.get_effects()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        }
+    }
+
     fn should_delete(&self) -> bool {
         self.lifetime >= self.max_lifetime
     }
@@ -172,7 +203,7 @@ pub struct Mob {
     health: i32,
     time_since_hurt: f32,
     time_since_shot: f32,
-    id: i32,
+    id: ObjectID,
     color: Color,
     target: Option<Point2>,
     shoot_direction: Vector2,
@@ -201,7 +232,7 @@ impl Mob {
             health: 5,
             time_since_hurt: 300.0,
             time_since_shot: 300.0,
-            id: 1,
+            id: ObjectID::new(1),
             color: Color::new(0.3, 0.7, 0.7, 0.7),
             target: None,
             shoot_direction: Vector2::new(0.0, 0.0),
@@ -218,7 +249,7 @@ impl Mob {
             health: 3,
             time_since_hurt: 300.0,
             time_since_shot: 300.0,
-            id: 0,
+            id: ObjectID::new(0),
             color: Color::from((222, 184, 135, 200)),
             target: Some(Point2::new(0.0, 0.0)),
             shoot_direction: Vector2::new(0.0, 0.0),
@@ -265,7 +296,7 @@ impl Mob {
 }
 
 impl Object for Mob {
-    fn get_id(&self) -> i32 {
+    fn get_id(&self) -> ObjectID {
         self.id
     }
     fn get_hitbox(&self) -> Option<&Hitbox> {
@@ -379,10 +410,10 @@ pub mod collision {
         }
     }
 
-    pub fn create_collision_event<T: Object, U: Object>(
-        object_1: &mut T,
-        object_2: &mut U,
-    ) -> Event {
+    pub fn find_penetration<T: Object, U: Object>(
+        object_1: &T,
+        object_2: &U,
+    ) -> Vector2 {
         if let (Some(hitbox_1), Some(hitbox_2)) = (object_1.get_hitbox(), object_2.get_hitbox()) {
             let (position_1, position_2) = (object_1.get_position(), object_2.get_position());
             let h1 = position_1 + hitbox_1.vec();
@@ -403,18 +434,15 @@ pub mod collision {
                     true => -1.0 * dy1,
                     false => dy2,
                 };
-                Event::Collision {
-                    penetration: match px.abs() > py.abs() {
-                        true => Vector2::new(0.0, py),
-                        false => Vector2::new(px, 0.0),
-                    },
-                    elasticity: 0.0,
+                match px.abs() > py.abs() {
+                    true => Vector2::new(0.0, py),
+                    false => Vector2::new(px, 0.0),
                 }
             } else {
-                Event::NoCollision
+                Vector2::new(0.0, 0.0)
             }
         } else {
-            Event::None
+            Vector2::new(0.0, 0.0)
         }
     }
 }
