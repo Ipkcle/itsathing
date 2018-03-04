@@ -169,6 +169,7 @@ impl MainState {
             }
         }
     }
+
     fn calculate_collsions(&mut self, dt: f32) {
         //TODO clean this up
         Self::object_list_collisions(dt, &mut self.mobs, &mut self.projectiles);
