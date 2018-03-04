@@ -1,5 +1,8 @@
 mod physics;
+pub mod bullet;
 pub mod event;
+pub mod collision;
+
 use ggez::graphics::{Point2, Vector2};
 use ggez::graphics::Color;
 use self::physics::ActorPhysics;
@@ -8,7 +11,9 @@ use self::event::Event;
 use assets::DrawableAsset;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ObjectID{ value: u32 }
+pub struct ObjectID {
+    value: u32,
+}
 
 impl ObjectID {
     pub fn new(value: u32) -> ObjectID {
@@ -19,34 +24,69 @@ impl ObjectID {
     }
 }
 
-pub trait Object {
-    fn get_drawable_asset(&self) -> Option<DrawableAsset> {
-        None
+pub trait Renderable: Object {
+    fn get_drawable_asset(&self) -> DrawableAsset;
+    fn get_color(&self) -> Color;
+}
+
+pub trait HasHitbox: Object {
+    fn get_hitbox(&self) -> &Hitbox;
+}
+
+pub trait HasCollisionEvents: HasHitbox {
+    fn create_collision_event<T: HasHitbox + CanRecieveEvents>(&mut self, object: &T)
+        -> Vec<Event>;
+}
+
+pub fn object_vec_collision_events<T: HasHitbox + CanRecieveEvents, U: HasCollisionEvents>(
+    dt: f32,
+    object_1: &mut T,
+    list: &mut Vec<U>,
+) {
+    for object_2 in list.iter_mut() {
+        let events = object_2.create_collision_event(object_1);
+        for event in events {
+            object_1.recieve_event(dt, event);
+        }
+    }
+}
+
+pub fn vec_vec_collision_events<T: HasHitbox + CanRecieveEvents, U: HasCollisionEvents>(
+    dt: f32,
+    objects_1: &mut Vec<T>,
+    objects_2: &mut Vec<U>,
+) {
+    for object_1 in objects_1.iter_mut() {
+        for object_2 in objects_2.iter_mut() {
+            let events = object_2.create_collision_event(object_1);
+            for event in events {
+                object_1.recieve_event(dt, event);
+            }
+        }
+    }
+}
+pub trait HasPhysics: HasHitbox {
+    fn get_elasticity(&self) -> f32 {
+        0.0
     }
 
-    fn get_color(&self) -> Option<Color> {
-        None
-    }
-
-    fn get_hitbox(&self) -> Option<&Hitbox> {
-        None
-    }
-
-    fn create_collision_event<T: Object>(&mut self, _object: &T) -> Vec<Event> {
-        Vec::new()
-    }
-
-    fn get_position(&self) -> Point2;
-
-    fn recieve_event(&mut self, _dt: f32, _event: Event) {
+    fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
         //do nothing
     }
+}
+
+pub trait CanRecieveEvents: Object {
+    fn recieve_event(&mut self, dt: f32, event: Event);
 
     fn recieve_events(&mut self, dt: f32, events: Vec<Event>) {
         for event in events {
             self.recieve_event(dt, event);
         }
     }
+}
+
+pub trait Object {
+    fn get_position(&self) -> Point2;
 
     fn step(&mut self, _dt: f32) {
         //do nothing
@@ -77,120 +117,27 @@ impl Block {
     }
 }
 
+impl Renderable for Block {
+    fn get_drawable_asset(&self) -> DrawableAsset {
+        self.mesh
+    }
+
+    fn get_color(&self) -> Color {
+        Color::new(0.3, 0.7, 0.3, 0.7)
+    }
+}
+
+impl HasHitbox for Block {
+    fn get_hitbox(&self) -> &Hitbox {
+        &self.hitbox
+    }
+}
+
+impl HasPhysics for Block {}
+
 impl Object for Block {
-    fn get_hitbox(&self) -> Option<&Hitbox> {
-        Some(&self.hitbox)
-    }
-
-    fn get_drawable_asset(&self) -> Option<DrawableAsset> {
-        Some(self.mesh)
-    }
-
     fn get_position(&self) -> Point2 {
         self.position
-    }
-
-    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
-        vec![Event::Collision {
-            penetration: collision::find_penetration(object, self),
-            elasticity: 0.0,
-        }]
-    }
-
-    fn get_color(&self) -> Option<Color> {
-        Some(Color::new(0.3, 0.7, 0.3, 0.7))
-    }
-}
-
-pub struct Projectile {
-    hitbox: Hitbox,
-    mesh: DrawableAsset,
-    position: Point2,
-    physics: ActorPhysics,
-    lifetime: f32,
-    max_lifetime: f32,
-    effects: Vec<Event>,
-    color: Color,
-    whitelist: Vec<ObjectID>,
-}
-
-impl Projectile {
-    pub fn bullet(position: Point2, velocity: Vector2, color: Color, whitelist: Vec<ObjectID>) -> Self {
-        let mut effects = Vec::new();
-        effects.push(Event::Damage(1));
-        effects.push(Event::Impulse(400.0 * velocity.normalize()));
-        let mut bullet = Self {
-            hitbox: Hitbox::new(Vector2::new(2.0, 2.0)),
-            mesh: DrawableAsset::Bullet,
-            position,
-            physics: ActorPhysics::new(0.0),
-            lifetime: 0.0,
-            max_lifetime: 1.0,
-            effects,
-            color,
-            whitelist,
-        };
-        bullet.physics.set_velocity(velocity);
-        bullet
-    }
-
-    fn update_position(&mut self, dt: f32) {
-        if self.physics.get_velocity().norm() > 10.0 {
-            self.position += self.physics.get_velocity() * dt;
-        }
-    }
-
-    pub fn get_whitelist(&self) -> Vec<ObjectID> {
-        self.whitelist.clone()
-    }
-
-    pub fn mark_for_deletion(&mut self) {
-        self.lifetime += 1000.0;
-    }
-
-    fn get_effects(&self) -> Vec<Event> {
-        self.effects.clone()
-    }
-}
-
-impl Object for Projectile {
-    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
-        if collision::is_intersecting(self, object) {
-        if !self.get_whitelist().iter().any(|x| *x == object.get_id()) {
-                self.mark_for_deletion();
-                self.get_effects()
-            } else {
-                Vec::new()
-            }
-        } else {
-            Vec::new()
-        }
-    }
-
-    fn should_delete(&self) -> bool {
-        self.lifetime >= self.max_lifetime
-    }
-
-    fn get_hitbox(&self) -> Option<&Hitbox> {
-        Some(&self.hitbox)
-    }
-
-    fn get_drawable_asset(&self) -> Option<DrawableAsset> {
-        Some(self.mesh)
-    }
-
-    fn get_position(&self) -> Point2 {
-        self.position
-    }
-
-    fn get_color(&self) -> Option<Color> {
-        Some(self.color)
-    }
-
-    fn step(&mut self, dt: f32) {
-        self.lifetime += dt;
-        self.physics.step(dt);
-        self.update_position(dt);
     }
 }
 
@@ -256,17 +203,16 @@ impl Mob {
         }
     }
 
-
     fn update_position(&mut self, dt: f32) {
         if self.physics.get_velocity().norm() > 10.0 {
             self.position += self.physics.get_velocity() * dt;
         }
     }
 
-    pub fn shoot(&mut self) -> Option<Projectile> {
+    pub fn shoot(&mut self) -> Option<bullet::Bullet> {
         if self.time_since_shot >= 0.2 {
             self.time_since_shot = 0.0;
-            Some(Projectile::bullet(
+            Some(bullet::Bullet::new(
                 self.position + 0.5 * self.hitbox.vec(),
                 500.0 * self.shoot_direction.normalize(),
                 Color::new(0.9, 0.9, 0.9, 1.0),
@@ -295,23 +241,56 @@ impl Mob {
         }
     }
 }
+impl HasHitbox for Mob {
+    fn get_hitbox(&self) -> &Hitbox {
+        &self.hitbox
+    }
+}
+
+impl HasPhysics for Mob {
+    fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
+        let p = collision.get_penetration();
+        self.position -= p;
+        let mut v = self.physics.get_velocity();
+        match (p.x == 0.0, p.y == 0.0) {
+            (false, true) => v.x = 0.0,
+            (true, false) => v.y = 0.0,
+            _ => (),
+        }
+        self.physics.set_velocity(v);
+    }
+}
+
+impl Renderable for Mob {
+    fn get_drawable_asset(&self) -> DrawableAsset {
+        self.mesh
+    }
+
+    fn get_color(&self) -> Color {
+        if self.time_since_hurt < 0.15 {
+            Color::new(0.9, 0.4, 0.4, 0.7)
+        } else {
+            self.color
+        }
+    }
+}
+
+impl CanRecieveEvents for Mob {
+    fn recieve_event(&mut self, _dt: f32, event: Event) {
+        match event {
+            Event::Damage(damage) => {
+                self.health -= damage;
+                self.time_since_hurt = 0.0
+            }
+            Event::Impulse(vector) => self.physics.add_impulse(vector),
+            _ => (),
+        }
+    }
+}
 
 impl Object for Mob {
-    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
-        vec![Event::Collision {
-            penetration: collision::find_penetration(object, self),
-            elasticity: 0.0,
-        }]
-    }
     fn get_id(&self) -> ObjectID {
         self.id
-    }
-    fn get_hitbox(&self) -> Option<&Hitbox> {
-        Some(&self.hitbox)
-    }
-
-    fn get_drawable_asset(&self) -> Option<DrawableAsset> {
-        Some(self.mesh)
     }
 
     fn get_position(&self) -> Point2 {
@@ -333,123 +312,7 @@ impl Object for Mob {
         }
     }
 
-    fn get_color(&self) -> Option<Color> {
-        if self.time_since_hurt < 0.15 {
-            Some(Color::new(0.9, 0.4, 0.4, 0.7))
-        } else {
-            Some(self.color)
-        }
-    }
-
     fn should_delete(&self) -> bool {
         self.health <= 0
-    }
-
-    fn recieve_event(&mut self, _dt: f32, event: Event) {
-        match event {
-            Event::Collision { penetration: p, .. } => {
-                self.position -= p;
-                let mut v = self.physics.get_velocity();
-                match (p.x == 0.0, p.y == 0.0) {
-                    (false, true) => v.x = 0.0,
-                    (true, false) => v.y = 0.0,
-                    _ => (),
-                }
-                self.physics.set_velocity(v);
-            }
-            Event::Damage(damage) => {
-                self.health -= damage;
-                self.time_since_hurt = 0.0
-            }
-            Event::Impulse(vector) => self.physics.add_impulse(vector),
-            _ => (),
-        }
-    }
-}
-
-pub mod collision {
-    use super::Object;
-    use super::event::Event;
-    use ggez::graphics::Vector2;
-
-    pub struct Hitbox(Vector2);
-
-    impl Hitbox {
-        pub fn new(size: Vector2) -> Self {
-            Hitbox(size)
-        }
-
-        pub fn vec(&self) -> Vector2 {
-            self.0
-        }
-    }
-
-    fn get_hitbox_distances<T: Object, U: Object>(
-        object_1: &T,
-        object_2: &U,
-    ) -> Option<(f32, f32, f32, f32)> {
-        if let (Some(hitbox_1), Some(hitbox_2)) = (object_1.get_hitbox(), object_2.get_hitbox()) {
-            let (position_1, position_2) = (object_1.get_position(), object_2.get_position());
-            let h1 = position_1 + hitbox_1.vec();
-            let h2 = position_2 + hitbox_2.vec();
-
-            //TODO move into vectors for more concise code.
-            let dx1 = h2.x - position_1.x;
-            let dx2 = h1.x - position_2.x;
-            let dy1 = h2.y - position_1.y;
-            let dy2 = h1.y - position_2.y;
-
-            Some((dx1, dx2, dy1, dy2))
-        } else {
-            None
-        }
-    }
-
-    pub fn get_distance<T: Object, U: Object>(object_1: &T, object_2: &U) -> f32 {
-        (object_1.get_position() - object_2.get_position()).norm()
-    }
-
-    pub fn is_intersecting<T: Object, U: Object>(object_1: &T, object_2: &U) -> bool {
-        if let Some((dx1, dx2, dy1, dy2)) = get_hitbox_distances(object_1, object_2) {
-            (dx1 > 0.0) & (dx2 > 0.0) & (dy1 > 0.0) & (dy2 > 0.0)
-        } else {
-            false
-        }
-    }
-
-    pub fn find_penetration<T: Object, U: Object>(
-        object_1: &T,
-        object_2: &U,
-    ) -> Vector2 {
-        if let (Some(hitbox_1), Some(hitbox_2)) = (object_1.get_hitbox(), object_2.get_hitbox()) {
-            let (position_1, position_2) = (object_1.get_position(), object_2.get_position());
-            let h1 = position_1 + hitbox_1.vec();
-            let h2 = position_2 + hitbox_2.vec();
-
-            //TODO move into vectors for more concise code.
-            let dx1 = h2.x - position_1.x;
-            let dx2 = h1.x - position_2.x;
-            let dy1 = h2.y - position_1.y;
-            let dy2 = h1.y - position_2.y;
-
-            if (dx1 > 0.0) & (dx2 > 0.0) & (dy1 > 0.0) & (dy2 > 0.0) {
-                let px = match dx1.abs() < dx2.abs() {
-                    true => -1.0 * dx1,
-                    false => dx2,
-                };
-                let py = match dy1.abs() < dy2.abs() {
-                    true => -1.0 * dy1,
-                    false => dy2,
-                };
-                match px.abs() > py.abs() {
-                    true => Vector2::new(0.0, py),
-                    false => Vector2::new(px, 0.0),
-                }
-            } else {
-                Vector2::new(0.0, 0.0)
-            }
-        } else {
-            Vector2::new(0.0, 0.0)
-        }
     }
 }
