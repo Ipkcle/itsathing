@@ -25,15 +25,15 @@ pub trait Renderable: Object {
     fn get_color(&self) -> Color;
 }
 
-pub trait HasHitbox: Object {
+pub trait Hitbox: Object {
     fn get_hitbox(&self) -> &Hitbox;
 }
 
-pub trait HasCollisionEvents: HasHitbox {
+pub trait CollisionEvents: HasHitbox {
     fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event>;
 }
 
-pub trait HasPhysics: HasHitbox {
+pub trait Physics: HasHitbox {
     fn create_collision_data<T: HasHitbox>(&self, object: &T) -> Vec<Event>;
     fn recieve_collision_data(&mut self, dt: f32, event: Event);
 }
@@ -90,14 +90,13 @@ impl Renderable for Block {
     }
 }
 
-impl HasHitbox for Block {
+impl Hitbox for Block {
     fn get_hitbox(&self) -> &Hitbox {
         &self.hitbox
     }
 }
 
-impl HasCollision for Block {
-
+impl HasPhysics for Block {
     fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
         vec![Event::Collision {
             penetration: collision::find_penetration(object, self),
@@ -214,7 +213,7 @@ impl Mob {
     }
 }
 
-impl HasCollision for Mob {
+impl Physics for Mob {
     fn get_hitbox(&self) -> &Hitbox {
         &self.hitbox
     }
