@@ -45,11 +45,11 @@ impl Bullet {
         }
     }
 
-    pub fn get_whitelist(&self) -> Vec<ObjectID> {
+    fn get_whitelist(&self) -> Vec<ObjectID> {
         self.whitelist.clone()
     }
 
-    pub fn mark_for_deletion(&mut self) {
+    fn mark_for_deletion(&mut self) {
         self.lifetime += 1000.0;
     }
 
