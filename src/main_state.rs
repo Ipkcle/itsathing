@@ -10,6 +10,7 @@ use game_object::{Block, Mob, Object, Projectile};
 use ggez::graphics::Drawable;
 use game_object::event::Event;
 use game_object::collision;
+use utils::get_two;
 
 enum Action {
     None,
@@ -137,21 +138,51 @@ impl MainState {
         }
     }
 
-    fn single_object_collisions<T: Object, U: Object>(dt: f32, object: &mut T, list: &mut Vec<U>) {
-        for collider in list.iter_mut() {
-            let events = collider.create_collision_event(object);
+    fn object_collisions<T: Object, U: Object>(dt: f32, object: &mut T, list: &mut Vec<U>) {
+        for object_2 in list.iter_mut() {
+            let events = object_2.create_collision_event(object);
             object.recieve_events(dt, events);
         }
     }
 
+    fn object_list_collisions<T: Object, U: Object>(
+        dt: f32,
+        objects_1: &mut Vec<T>,
+        objects_2: &mut Vec<U>,
+    ) {
+        for object_1 in objects_1.iter_mut() {
+            for object_2 in objects_2.iter_mut() {
+                let events = object_2.create_collision_event(object_1);
+                object_1.recieve_events(dt, events);
+            }
+        }
+    }
+
+    fn object_list_self_collisions<T: Object>(
+        dt: f32,
+        list: &mut Vec<T>,
+    ) {
+        let mut n = list.len();
+        for x in 0..n {
+            for y in 0..n {
+                if let Ok((object_1, object_2)) = get_two(list, x, y) {
+                    let events = object_2.create_collision_event(object_1);
+                    object_1.recieve_events(dt, events);
+                }
+            }
+        }
+    }
     fn calculate_collsions(&mut self, dt: f32) {
         //TODO clean this up
-        for mob in self.mobs.iter_mut() {
-            Self::single_object_collisions(dt, mob, &mut self.projectiles);
-            Self::single_object_collisions(dt, mob, &mut self.blocks);
-        }
-        Self::single_object_collisions(dt, &mut self.player_mob, &mut self.projectiles);
-        Self::single_object_collisions(dt, &mut self.player_mob, &mut self.blocks);
+        Self::object_list_collisions(dt, &mut self.mobs, &mut self.projectiles);
+        Self::object_list_collisions(dt, &mut self.mobs, &mut self.blocks);
+        Self::object_list_self_collisions(dt, &mut self.mobs);
+        Self::object_collisions(dt, &mut self.player_mob, &mut self.blocks);
+        Self::object_collisions(dt, &mut self.player_mob, &mut self.projectiles);
+        /*
+        Self::object_list_collisions(dt, &mut vec!(self.player_mob), &mut self.projectiles);
+        Self::object_list_collisions(dt, &mut vec!(self.player_mob), &mut self.blocks);
+        */
     }
 
     fn world_to_screen_coords(&self, point: Point2) -> Point2 {

@@ -14,7 +14,7 @@ impl ObjectID {
     pub fn new(value: u32) -> ObjectID {
         ObjectID { value }
     }
-    pub fn v(&self) -> u32 {
+    pub fn value(&self) -> u32 {
         self.value
     }
 }
@@ -256,6 +256,7 @@ impl Mob {
         }
     }
 
+
     fn update_position(&mut self, dt: f32) {
         if self.physics.get_velocity().norm() > 10.0 {
             self.position += self.physics.get_velocity() * dt;
@@ -296,6 +297,12 @@ impl Mob {
 }
 
 impl Object for Mob {
+    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
+        vec![Event::Collision {
+            penetration: collision::find_penetration(object, self),
+            elasticity: 0.0,
+        }]
+    }
     fn get_id(&self) -> ObjectID {
         self.id
     }

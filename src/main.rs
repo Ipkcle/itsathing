@@ -8,6 +8,7 @@ use ggez::ContextBuilder;
 mod game_object;
 mod assets;
 mod main_state;
+mod utils;
 
 fn main() {
     let (width, height) = (800, 450);
