@@ -137,25 +137,21 @@ impl MainState {
         }
     }
 
+    fn single_object_collisions<T: Object, U: Object>(dt: f32, object: &mut T, list: &mut Vec<U>) {
+        for collider in list.iter_mut() {
+            let events = collider.create_collision_event(object);
+            object.recieve_events(dt, events);
+        }
+    }
+
     fn calculate_collsions(&mut self, dt: f32) {
         //TODO clean this up
-        for block in self.blocks.iter_mut() {
-            for mob in self.mobs.iter_mut() {
-                let events = block.create_collision_event(mob);
-                mob.recieve_events(dt, events);
-            }
-            let player_events = block.create_collision_event(&self.player_mob);
-            self.player_mob.recieve_events(dt, player_events);
+        for mob in self.mobs.iter_mut() {
+            Self::single_object_collisions(dt, mob, &mut self.projectiles);
+            Self::single_object_collisions(dt, mob, &mut self.blocks);
         }
-
-        for projectile in self.projectiles.iter_mut() {
-            for mob in self.mobs.iter_mut() {
-                let events = projectile.create_collision_event(mob);
-                mob.recieve_events(dt, events);
-            }
-            let events = projectile.create_collision_event(&self.player_mob);
-            self.player_mob.recieve_events(dt, events);
-        }
+        Self::single_object_collisions(dt, &mut self.player_mob, &mut self.projectiles);
+        Self::single_object_collisions(dt, &mut self.player_mob, &mut self.blocks);
     }
 
     fn world_to_screen_coords(&self, point: Point2) -> Point2 {
