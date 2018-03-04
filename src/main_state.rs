@@ -7,7 +7,6 @@ use ggez::error::GameError;
 use assets::Assets;
 use game_object::*;
 use game_object::bullet::Bullet;
-use utils::get_two;
 
 enum Action {
     None,
@@ -135,52 +134,15 @@ impl MainState {
         }
     }
 
-    fn object_collisions<T: HasCollision + CanRecieveEvents, U: HasCollision + CanRecieveEvents>(dt: f32, object: &mut T, list: &mut Vec<U>) {
-        for object_2 in list.iter_mut() {
-            let events = object_2.create_collision_event(object);
-            object.recieve_events(dt, events);
-        }
-    }
-
-    fn object_list_collisions<T: HasCollision + CanRecieveEvents, U: HasCollision + CanRecieveEvents>(
-        dt: f32,
-        objects_1: &mut Vec<T>,
-        objects_2: &mut Vec<U>,
-    ) {
-        for object_1 in objects_1.iter_mut() {
-            for object_2 in objects_2.iter_mut() {
-                let events = object_2.create_collision_event(object_1);
-                object_1.recieve_events(dt, events);
-            }
-        }
-    }
-
-    fn object_list_self_collisions<T: HasCollision + CanRecieveEvents>(
-        dt: f32,
-        list: &mut Vec<T>,
-    ) {
-        let n = list.len();
-        for x in 0..n {
-            for y in 0..n {
-                if let Ok((object_1, object_2)) = get_two(list, x, y) {
-                    let events = object_2.create_collision_event(object_1);
-                    object_1.recieve_events(dt, events);
-                }
-            }
-        }
-    }
 
     fn calculate_collsions(&mut self, dt: f32) {
         //TODO clean this up
-        Self::object_list_collisions(dt, &mut self.mobs, &mut self.projectiles);
-        Self::object_list_collisions(dt, &mut self.mobs, &mut self.blocks);
-        Self::object_list_self_collisions(dt, &mut self.mobs);
-        Self::object_collisions(dt, &mut self.player_mob, &mut self.blocks);
-        Self::object_collisions(dt, &mut self.player_mob, &mut self.projectiles);
-        /*
-        Self::object_list_collisions(dt, &mut vec!(self.player_mob), &mut self.projectiles);
-        Self::object_list_collisions(dt, &mut vec!(self.player_mob), &mut self.blocks);
-        */
+        //Self::object_list_collisions(dt, &mut self.mobs, &mut self.projectiles);
+        collision::vec_vec_physics(dt, &mut self.mobs, &mut self.blocks);
+        collision::vec_physics(dt, &mut self.mobs);
+        collision::object_vec_physics(dt, &mut self.player_mob, &mut self.blocks);
+        collision::object_vec_physics(dt, &mut self.player_mob, &mut self.mobs);
+        //Self::object_collisions(dt, &mut self.player_mob, &mut self.projectiles);
     }
 
     fn world_to_screen_coords(&self, point: Point2) -> Point2 {
@@ -205,7 +167,7 @@ impl MainState {
         self.camera.y = y;
     }
 
-    fn draw_object<T: Object>(&self, ctx: &mut Context, object: &T) -> GameResult<()> {
+    fn draw_object<T: Renderable>(&self, ctx: &mut Context, object: &T) -> GameResult<()> {
         //Find the pixel position on screen of the object.
         let pos = self.world_to_screen_coords(object.get_position());
 
@@ -215,24 +177,19 @@ impl MainState {
         }
 
         //Draw the drawable component if the object has one, else return an error.
-        if let Some(d) = object.get_drawable_asset() {
-            //get the mesh from assets
-            let drawable = self.assets.get_drawable(d);
+        let d = object.get_drawable_asset();
+        //get the mesh from assets
+        let drawable = self.assets.get_drawable(d);
 
-            //Set the drawing parameters.
-            let drawparams = graphics::DrawParam {
-                dest: pos,
-                color: object.get_color(),
-                ..Default::default()
-            };
+        //Set the drawing parameters.
+        let drawparams = graphics::DrawParam {
+            dest: pos,
+            color: Some(object.get_color()),
+            ..Default::default()
+        };
 
-            //Actually draw to the context.
-            graphics::draw_ex(ctx, drawable, drawparams)
-        } else {
-            Err(GameError::RenderError(String::from(
-                "Tried to render entity with no renderable component",
-            )))
-        }
+        //Actually draw to the context.
+        graphics::draw_ex(ctx, drawable, drawparams)
     }
 }
 
@@ -276,26 +233,20 @@ impl EventHandler for MainState {
         }
         //draw objects with renderable component
         for object in &self.mobs {
-            if let Some(..) = object.get_drawable_asset() {
-                if let Err(error) = self.draw_object(ctx, object) {
-                    return Err(error);
-                }
+            if let Err(error) = self.draw_object(ctx, object) {
+                return Err(error);
             }
         }
 
         for object in &self.blocks {
-            if let Some(..) = object.get_drawable_asset() {
-                if let Err(error) = self.draw_object(ctx, object) {
-                    return Err(error);
-                }
+            if let Err(error) = self.draw_object(ctx, object) {
+                return Err(error);
             }
         }
 
         for object in &self.projectiles {
-            if let Some(..) = object.get_drawable_asset() {
-                if let Err(error) = self.draw_object(ctx, object) {
-                    return Err(error);
-                }
+            if let Err(error) = self.draw_object(ctx, object) {
+                return Err(error);
             }
         }
 

@@ -1,4 +1,4 @@
-use ggez::graphics::{Point2, Vector2};
+use ggez::graphics::Vector2;
 
 struct Drag {
     drag_constant: f32,
@@ -46,7 +46,7 @@ impl ActorPhysics {
     pub fn set_acceleration(&mut self, accel: Vector2) {
         self.acceleration = accel;
     }
-    
+
     pub fn set_velocity(&mut self, vel: Vector2) {
         self.velocity = vel;
     }

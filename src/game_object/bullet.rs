@@ -4,7 +4,8 @@ use super::physics::ActorPhysics;
 use super::collision::Hitbox;
 use super::event::Event;
 use super::Object;
-use super::HasCollision;
+use super::HasHitbox;
+use super::HasCollisionEvents;
 use super::Renderable;
 use super::ObjectID;
 use assets::DrawableAsset;
@@ -70,8 +71,8 @@ impl Renderable for Bullet {
     }
 }
 
-impl HasCollision for Bullet {
-    fn create_collision_event<T: HasCollision>(&mut self, object: &T) -> Vec<Event> {
+impl HasCollisionEvents for Bullet {
+    fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event> {
         if super::collision::is_intersecting(self, object) {
         if !self.get_whitelist().iter().any(|x| *x == object.get_id()) {
                 self.mark_for_deletion();
@@ -83,7 +84,9 @@ impl HasCollision for Bullet {
             Vec::new()
         }
     }
+}
 
+impl HasHitbox for Bullet {
     fn get_hitbox(&self) -> &Hitbox {
         &self.hitbox
     }

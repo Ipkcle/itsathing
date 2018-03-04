@@ -1,6 +1,8 @@
 mod physics;
 pub mod bullet;
 pub mod event;
+pub mod collision;
+
 use ggez::graphics::{Point2, Vector2};
 use ggez::graphics::Color;
 use self::physics::ActorPhysics;
@@ -9,7 +11,9 @@ use self::event::Event;
 use assets::DrawableAsset;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ObjectID{ value: u32 }
+pub struct ObjectID {
+    value: u32,
+}
 
 impl ObjectID {
     pub fn new(value: u32) -> ObjectID {
@@ -25,17 +29,26 @@ pub trait Renderable: Object {
     fn get_color(&self) -> Color;
 }
 
-pub trait Hitbox: Object {
+pub trait HasHitbox: Object {
     fn get_hitbox(&self) -> &Hitbox;
 }
 
-pub trait CollisionEvents: HasHitbox {
-    fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event>;
+pub trait HasCollisionEvents: HasHitbox {
+    fn create_collision_event<T: HasHitbox + CanRecieveEvents>(&mut self, object: &T)
+        -> Vec<Event>;
 }
 
-pub trait Physics: HasHitbox {
-    fn create_collision_data<T: HasHitbox>(&self, object: &T) -> Vec<Event>;
-    fn recieve_collision_data(&mut self, dt: f32, event: Event);
+fn apply_collision_events() {
+
+}
+pub trait HasPhysics: HasHitbox {
+    fn get_elasticity(&self) -> f32 {
+        0.0
+    }
+
+    fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
+        //do nothing
+    }
 }
 
 pub trait CanRecieveEvents: Object {
@@ -90,20 +103,13 @@ impl Renderable for Block {
     }
 }
 
-impl Hitbox for Block {
+impl HasHitbox for Block {
     fn get_hitbox(&self) -> &Hitbox {
         &self.hitbox
     }
 }
 
-impl HasPhysics for Block {
-    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
-        vec![Event::Collision {
-            penetration: collision::find_penetration(object, self),
-            elasticity: 0.0,
-        }]
-    }
-}
+impl HasPhysics for Block {}
 
 impl Object for Block {
     fn get_position(&self) -> Point2 {
@@ -173,7 +179,6 @@ impl Mob {
         }
     }
 
-
     fn update_position(&mut self, dt: f32) {
         if self.physics.get_velocity().norm() > 10.0 {
             self.position += self.physics.get_velocity() * dt;
@@ -212,17 +217,23 @@ impl Mob {
         }
     }
 }
-
-impl Physics for Mob {
+impl HasHitbox for Mob {
     fn get_hitbox(&self) -> &Hitbox {
         &self.hitbox
     }
+}
 
-    fn create_collision_event<T: HasCollision>(&mut self, object: &T) -> Vec<Event> {
-        vec![Event::Collision {
-            penetration: collision::find_penetration(object, self),
-            elasticity: 0.0,
-        }]
+impl HasPhysics for Mob {
+    fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
+        let p = collision.get_penetration();
+        self.position -= p;
+        let mut v = self.physics.get_velocity();
+        match (p.x == 0.0, p.y == 0.0) {
+            (false, true) => v.x = 0.0,
+            (true, false) => v.y = 0.0,
+            _ => (),
+        }
+        self.physics.set_velocity(v);
     }
 }
 
@@ -243,16 +254,6 @@ impl Renderable for Mob {
 impl CanRecieveEvents for Mob {
     fn recieve_event(&mut self, _dt: f32, event: Event) {
         match event {
-            Event::Collision { penetration: p, .. } => {
-                self.position -= p;
-                let mut v = self.physics.get_velocity();
-                match (p.x == 0.0, p.y == 0.0) {
-                    (false, true) => v.x = 0.0,
-                    (true, false) => v.y = 0.0,
-                    _ => (),
-                }
-                self.physics.set_velocity(v);
-            }
             Event::Damage(damage) => {
                 self.health -= damage;
                 self.time_since_hurt = 0.0
@@ -267,7 +268,6 @@ impl Object for Mob {
     fn get_id(&self) -> ObjectID {
         self.id
     }
-
 
     fn get_position(&self) -> Point2 {
         self.position
@@ -288,87 +288,7 @@ impl Object for Mob {
         }
     }
 
-
     fn should_delete(&self) -> bool {
         self.health <= 0
-    }
-}
-
-pub mod collision {
-    use super::HasCollision;
-    use super::Object;
-    use super::event::Event;
-    use ggez::graphics::Vector2;
-
-    pub struct Hitbox(Vector2);
-
-    impl Hitbox {
-        pub fn new(size: Vector2) -> Self {
-            Hitbox(size)
-        }
-
-        pub fn vec(&self) -> Vector2 {
-            self.0
-        }
-    }
-
-    fn get_hitbox_distances<T: HasCollision, U: HasCollision>(
-        object_1: &T,
-        object_2: &U,
-    ) -> (f32, f32, f32, f32) {
-        let (hitbox_1, hitbox_2) = (object_1.get_hitbox(), object_2.get_hitbox());
-        let (position_1, position_2) = (object_1.get_position(), object_2.get_position());
-        let h1 = position_1 + hitbox_1.vec();
-        let h2 = position_2 + hitbox_2.vec();
-
-        //TODO move into vectors for more concise code.
-        let dx1 = h2.x - position_1.x;
-        let dx2 = h1.x - position_2.x;
-        let dy1 = h2.y - position_1.y;
-        let dy2 = h1.y - position_2.y;
-
-        (dx1, dx2, dy1, dy2)
-    }
-
-    pub fn get_distance<T: Object, U: Object>(object_1: &T, object_2: &U) -> f32 {
-        (object_1.get_position() - object_2.get_position()).norm()
-    }
-
-    pub fn is_intersecting<T: HasCollision, U: HasCollision>(object_1: &T, object_2: &U) -> bool {
-        let (dx1, dx2, dy1, dy2) = get_hitbox_distances(object_1, object_2);
-        (dx1 > 0.0) & (dx2 > 0.0) & (dy1 > 0.0) & (dy2 > 0.0)
-    }
-
-    pub fn find_penetration<T: HasCollision, U: HasCollision>(
-        object_1: &T,
-        object_2: &U,
-    ) -> Vector2 {
-        let (hitbox_1, hitbox_2) = (object_1.get_hitbox(), object_2.get_hitbox());
-        let (position_1, position_2) = (object_1.get_position(), object_2.get_position());
-        let h1 = position_1 + hitbox_1.vec();
-        let h2 = position_2 + hitbox_2.vec();
-
-        //TODO move into vectors for more concise code.
-        let dx1 = h2.x - position_1.x;
-        let dx2 = h1.x - position_2.x;
-        let dy1 = h2.y - position_1.y;
-        let dy2 = h1.y - position_2.y;
-
-        if (dx1 > 0.0) & (dx2 > 0.0) & (dy1 > 0.0) & (dy2 > 0.0) {
-            let px = match dx1.abs() < dx2.abs() {
-                true => -1.0 * dx1,
-                false => dx2,
-            };
-            let py = match dy1.abs() < dy2.abs() {
-                true => -1.0 * dy1,
-                false => dy2,
-            };
-            match px.abs() > py.abs() {
-                true => Vector2::new(0.0, py),
-                false => Vector2::new(px, 0.0),
-            }
-        } else {
-            Vector2::new(0.0, 0.0)
-        }
     }
 }
