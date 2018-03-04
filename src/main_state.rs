@@ -5,7 +5,7 @@ use ggez::event::*;
 use ggez::timer;
 use ggez::error::GameError;
 use assets::Assets;
-use game_object::{Block, Mob, Object};
+use game_object::*;
 use game_object::bullet::Bullet;
 use utils::get_two;
 
@@ -135,14 +135,14 @@ impl MainState {
         }
     }
 
-    fn object_collisions<T: Object, U: Object>(dt: f32, object: &mut T, list: &mut Vec<U>) {
+    fn object_collisions<T: HasCollision + CanRecieveEvents, U: HasCollision + CanRecieveEvents>(dt: f32, object: &mut T, list: &mut Vec<U>) {
         for object_2 in list.iter_mut() {
             let events = object_2.create_collision_event(object);
             object.recieve_events(dt, events);
         }
     }
 
-    fn object_list_collisions<T: Object, U: Object>(
+    fn object_list_collisions<T: HasCollision + CanRecieveEvents, U: HasCollision + CanRecieveEvents>(
         dt: f32,
         objects_1: &mut Vec<T>,
         objects_2: &mut Vec<U>,
@@ -155,7 +155,7 @@ impl MainState {
         }
     }
 
-    fn object_list_self_collisions<T: Object>(
+    fn object_list_self_collisions<T: HasCollision + CanRecieveEvents>(
         dt: f32,
         list: &mut Vec<T>,
     ) {

@@ -4,6 +4,8 @@ use super::physics::ActorPhysics;
 use super::collision::Hitbox;
 use super::event::Event;
 use super::Object;
+use super::HasCollision;
+use super::Renderable;
 use super::ObjectID;
 use assets::DrawableAsset;
 
@@ -58,8 +60,18 @@ impl Bullet {
     }
 }
 
-impl Object for Bullet {
-    fn create_collision_event<T: Object>(&mut self, object: &T) -> Vec<Event> {
+impl Renderable for Bullet {
+    fn get_drawable_asset(&self) -> DrawableAsset {
+        self.mesh
+    }
+
+    fn get_color(&self) -> Color {
+        self.color
+    }
+}
+
+impl HasCollision for Bullet {
+    fn create_collision_event<T: HasCollision>(&mut self, object: &T) -> Vec<Event> {
         if super::collision::is_intersecting(self, object) {
         if !self.get_whitelist().iter().any(|x| *x == object.get_id()) {
                 self.mark_for_deletion();
@@ -72,24 +84,19 @@ impl Object for Bullet {
         }
     }
 
+    fn get_hitbox(&self) -> &Hitbox {
+        &self.hitbox
+    }
+}
+
+impl Object for Bullet {
     fn should_delete(&self) -> bool {
         self.lifetime >= self.max_lifetime
     }
 
-    fn get_hitbox(&self) -> Option<&Hitbox> {
-        Some(&self.hitbox)
-    }
-
-    fn get_drawable_asset(&self) -> Option<DrawableAsset> {
-        Some(self.mesh)
-    }
 
     fn get_position(&self) -> Point2 {
         self.position
-    }
-
-    fn get_color(&self) -> Option<Color> {
-        Some(self.color)
     }
 
     fn step(&mut self, dt: f32) {
