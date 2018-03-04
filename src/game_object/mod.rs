@@ -38,8 +38,32 @@ pub trait HasCollisionEvents: HasHitbox {
         -> Vec<Event>;
 }
 
-fn apply_collision_events() {
+pub fn object_vec_collision_events<T: HasHitbox + CanRecieveEvents, U: HasCollisionEvents>(
+    dt: f32,
+    object_1: &mut T,
+    list: &mut Vec<U>,
+) {
+    for object_2 in list.iter_mut() {
+        let events = object_2.create_collision_event(object_1);
+        for event in events {
+            object_1.recieve_event(dt, event);
+        }
+    }
+}
 
+pub fn vec_vec_collision_events<T: HasHitbox + CanRecieveEvents, U: HasCollisionEvents>(
+    dt: f32,
+    objects_1: &mut Vec<T>,
+    objects_2: &mut Vec<U>,
+) {
+    for object_1 in objects_1.iter_mut() {
+        for object_2 in objects_2.iter_mut() {
+            let events = object_2.create_collision_event(object_1);
+            for event in events {
+                object_1.recieve_event(dt, event);
+            }
+        }
+    }
 }
 pub trait HasPhysics: HasHitbox {
     fn get_elasticity(&self) -> f32 {

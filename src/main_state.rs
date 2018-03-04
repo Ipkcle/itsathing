@@ -5,6 +5,7 @@ use ggez::event::*;
 use ggez::timer;
 use ggez::error::GameError;
 use assets::Assets;
+use game_object;
 use game_object::*;
 use game_object::bullet::Bullet;
 
@@ -138,6 +139,8 @@ impl MainState {
     fn calculate_collsions(&mut self, dt: f32) {
         //TODO clean this up
         //Self::object_list_collisions(dt, &mut self.mobs, &mut self.projectiles);
+        game_object::vec_vec_collision_events(dt, &mut self.mobs, &mut self.projectiles);
+        game_object::object_vec_collision_events(dt, &mut self.player_mob, &mut self.projectiles);
         collision::vec_vec_physics(dt, &mut self.mobs, &mut self.blocks);
         collision::vec_physics(dt, &mut self.mobs);
         collision::object_vec_physics(dt, &mut self.player_mob, &mut self.blocks);
