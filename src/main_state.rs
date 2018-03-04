@@ -1,15 +1,12 @@
 use ggez::{Context, GameResult};
 use ggez::graphics::{Point2, Vector2};
-use ggez::graphics::Color;
 use ggez::graphics;
 use ggez::event::*;
 use ggez::timer;
 use ggez::error::GameError;
 use assets::Assets;
-use game_object::{Block, Mob, Object, Projectile};
-use ggez::graphics::Drawable;
-use game_object::event::Event;
-use game_object::collision;
+use game_object::{Block, Mob, Object};
+use game_object::bullet::Bullet;
 use utils::get_two;
 
 enum Action {
@@ -54,7 +51,7 @@ pub struct MainState {
     //  player_gun:
     mobs: Vec<Mob>,
     blocks: Vec<Block>,
-    projectiles: Vec<Projectile>,
+    projectiles: Vec<Bullet>,
     camera: Vector2,
 }
 
@@ -162,7 +159,7 @@ impl MainState {
         dt: f32,
         list: &mut Vec<T>,
     ) {
-        let mut n = list.len();
+        let n = list.len();
         for x in 0..n {
             for y in 0..n {
                 if let Ok((object_1, object_2)) = get_two(list, x, y) {
