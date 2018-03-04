@@ -135,17 +135,16 @@ impl MainState {
         }
     }
 
-
-    fn calculate_collsions(&mut self, dt: f32) {
-        //TODO clean this up
-        //Self::object_list_collisions(dt, &mut self.mobs, &mut self.projectiles);
-        game_object::vec_vec_collision_events(dt, &mut self.mobs, &mut self.projectiles);
-        game_object::object_vec_collision_events(dt, &mut self.player_mob, &mut self.projectiles);
+    fn calculate_physics(&mut self, dt: f32) {
         collision::vec_vec_physics(dt, &mut self.mobs, &mut self.blocks);
         collision::vec_physics(dt, &mut self.mobs);
         collision::object_vec_physics(dt, &mut self.player_mob, &mut self.blocks);
         collision::object_vec_physics(dt, &mut self.player_mob, &mut self.mobs);
-        //Self::object_collisions(dt, &mut self.player_mob, &mut self.projectiles);
+    }
+
+    fn calculate_collision_events(&mut self, dt: f32) {
+        game_object::vec_vec_collision_events(dt, &mut self.mobs, &mut self.projectiles);
+        game_object::object_vec_collision_events(dt, &mut self.player_mob, &mut self.projectiles);
     }
 
     fn world_to_screen_coords(&self, point: Point2) -> Point2 {
@@ -203,7 +202,8 @@ impl EventHandler for MainState {
             let seconds = 1.0 / (DESIRED_FPS as f32);
             self.handle_player_input();
             self.calculate_step(seconds);
-            self.calculate_collsions(seconds);
+            self.calculate_physics(seconds);
+            self.calculate_collision_events(seconds);
             self.calculate_ai();
             self.clear_objects();
             self.update_camera();
