@@ -3,10 +3,11 @@ use ggez::graphics::{Point2, Vector2};
 use ggez::graphics;
 use ggez::event::*;
 use ggez::timer;
-use ggez::error::GameError;
 use assets::Assets;
 use game_object;
 use game_object::*;
+use game_object::block::Block;
+use game_object::mob::Mob;
 use game_object::bullet::Bullet;
 
 enum Action {
@@ -15,15 +16,16 @@ enum Action {
 }
 
 struct Input {
-    pub action: Action,
+    action: Action,
     up: bool,
     down: bool,
     left: bool,
     right: bool,
-    pub shoot_direction: Vector2,
-    pub x_axis: f32,
-    pub y_axis: f32,
-    pub shooting: bool,
+    move_stack: Vec<Vector2>,
+    shoot_direction: Vector2,
+    x_axis: f32,
+    y_axis: f32,
+    shooting: bool,
 }
 
 impl Input {
@@ -34,6 +36,7 @@ impl Input {
             down: false,
             left: false,
             right: false,
+            move_stack: Vec::new(),
             shoot_direction: Vector2::new(0.0, 0.0),
             x_axis: 0.0,
             y_axis: 0.0,
@@ -47,7 +50,7 @@ pub struct MainState {
     screen_h: u32,
     input: Input,
     assets: Assets,
-    player_mob: Mob,
+    player_mob: player::Player,
     //  player_gun:
     mobs: Vec<Mob>,
     blocks: Vec<Block>,
@@ -62,7 +65,7 @@ impl MainState {
             screen_h,
             input: Input::new(),
             assets: Assets::new(ctx),
-            player_mob: Mob::player(),
+            player_mob: player::Player::new(),
             mobs: Vec::new(),
             blocks: Vec::new(),
             projectiles: Vec::new(),
@@ -71,7 +74,13 @@ impl MainState {
         state.mobs.push(Mob::dummy(Point2::new(100.0, 100.0)));
         state.mobs.push(Mob::dummy(Point2::new(100.0, -100.0)));
         state.mobs.push(Mob::dummy(Point2::new(-100.0, -100.0)));
-        state.blocks.push(Block::new(10.0, 10.0));
+        state.mobs.push(Mob::dummy(Point2::new(150.0, 150.0)));
+        state.mobs.push(Mob::dummy(Point2::new(150.0, -150.0)));
+        state.mobs.push(Mob::dummy(Point2::new(-150.0, -150.0)));
+        state.blocks.push(Block::wallh(-190.0, 200.0));
+        state.blocks.push(Block::wallh(-190.0, -200.0));
+        state.blocks.push(Block::wallv(200.0, -200.0));
+        state.blocks.push(Block::wallv(-200.0, -200.0));
         Ok(state)
     }
 
@@ -127,6 +136,11 @@ impl MainState {
         self.projectiles
             .retain(|ref projectile| !projectile.should_delete());
         self.mobs.retain(|ref mob| !mob.should_delete());
+        if self.player_mob.should_delete() {
+            self.player_mob = player::Player::new();
+            self.mobs.drain(..);
+            self.projectiles.drain(..);
+        }
     }
 
     fn calculate_ai(&mut self) {
@@ -145,6 +159,7 @@ impl MainState {
     fn calculate_collision_events(&mut self, dt: f32) {
         game_object::vec_vec_collision_events(dt, &mut self.mobs, &mut self.projectiles);
         game_object::object_vec_collision_events(dt, &mut self.player_mob, &mut self.projectiles);
+        game_object::object_vec_collision_events(dt, &mut self.player_mob, &mut self.mobs);
     }
 
     fn world_to_screen_coords(&self, point: Point2) -> Point2 {
@@ -173,10 +188,10 @@ impl MainState {
         //Find the pixel position on screen of the object.
         let pos = self.world_to_screen_coords(object.get_position());
 
-        //If the object is not on screen, do nothing.
-        if !self.is_on_screen(pos) {
-            return Ok(());
-        }
+//      //If the object is not on screen, do nothing.
+//      if !self.is_on_screen(pos) {
+//          return Ok(());
+//      }
 
         //Draw the drawable component if the object has one, else return an error.
         let d = object.get_drawable_asset();
@@ -202,8 +217,8 @@ impl EventHandler for MainState {
             let seconds = 1.0 / (DESIRED_FPS as f32);
             self.handle_player_input();
             self.calculate_step(seconds);
-            self.calculate_physics(seconds);
             self.calculate_collision_events(seconds);
+            self.calculate_physics(seconds);
             self.calculate_ai();
             self.clear_objects();
             self.update_camera();

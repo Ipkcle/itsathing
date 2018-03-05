@@ -6,6 +6,8 @@ use ggez::Context;
 pub enum DrawableAsset {
     Player,
     Block,
+    Wallh,
+    Wallv,
     Bullet,
 }
 
@@ -28,6 +30,8 @@ impl Assets {
 struct DrawableAssets {
     player: Mesh,
     block: Mesh,
+    wallh: Mesh,
+    wallv: Mesh,
     bullet: Mesh,
 }
 
@@ -35,7 +39,9 @@ impl DrawableAssets {
     pub fn new(ctx: &mut Context) -> DrawableAssets {
         DrawableAssets {
             player: Self::rect(ctx, 10.0, 10.0),
-            block: Self::rect(ctx, 20.0, 30.0),
+            block: Self::rect(ctx, 20.0, 20.0),
+            wallh: Self::rect(ctx, 400.0, 20.0),
+            wallv: Self::rect(ctx, 20.0, 400.0),
             bullet: Self::rect(ctx, 2.0, 2.0),
         }
     }
@@ -69,6 +75,8 @@ impl DrawableAssets {
         match drawable_asset {
             DrawableAsset::Player => &self.player,
             DrawableAsset::Block => &self.block,
+            DrawableAsset::Wallh => &self.wallh,
+            DrawableAsset::Wallv => &self.wallv,
             DrawableAsset::Bullet => &self.bullet,
         }
     }

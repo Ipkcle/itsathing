@@ -1,12 +1,12 @@
 use ggez::graphics::{Point2, Vector2};
 use ggez::graphics::Color;
-use super::*;
 use super::physics::ActorPhysics;
 use super::collision::Hitbox;
 use super::event::Event;
+use super::*;
 use assets::DrawableAsset;
 
-pub struct Player {
+pub struct Mob {
     walk_acceleration: f32,
     mesh: DrawableAsset,
     hitbox: Hitbox,
@@ -19,35 +19,25 @@ pub struct Player {
     color: Color,
     target: Option<Point2>,
     shoot_direction: Vector2,
+    blacklist: Vec<ObjectID>,
 }
 
-impl Player {
-    pub fn new() -> Self {
-        //TODO write this in terms of max speed and seconds until max speed is hit. You need
-        //calculus.
-        let accel = 2500.0;
-        let max_speed = 250.0;
-        let drag_constant = accel / max_speed;
-        // ex. with v^2 drag
-        // accel_drag = v^2*C
-        // C = accel_drag/(v^2)
-        // want constant speed, so accel == accel_drag
-        // accel = 100, v = 10
-        // 100 = 10^2*C
-        // C = 1
-        Player {
-            walk_acceleration: accel,
+impl Mob {
+    pub fn dummy(position: Point2) -> Self {
+        Self {
+            walk_acceleration: 1000.0,
             mesh: DrawableAsset::Player,
             hitbox: Hitbox::new(Vector2::new(10.0, 10.0)),
-            physics: ActorPhysics::new(drag_constant),
-            position: Point2::new(0.0, 0.0),
-            health: 30,
+            physics: ActorPhysics::new(2.0),
+            position,
+            health: 5,
             time_since_hurt: 300.0,
             time_since_shot: 300.0,
-            id: ObjectID::new(1),
-            color: Color::new(0.3, 0.7, 0.7, 0.7),
-            target: None,
+            id: ObjectID::new(0),
+            color: Color::from((222, 184, 135, 200)),
+            target: Some(Point2::new(0.0, 0.0)),
             shoot_direction: Vector2::new(0.0, 0.0),
+            blacklist: vec![ObjectID::new(1)],
         }
     }
 
@@ -55,6 +45,10 @@ impl Player {
         if self.physics.get_velocity().norm() > 10.0 {
             self.position += self.physics.get_velocity() * dt;
         }
+    }
+
+    fn get_effects(&self) {
+
     }
 
     pub fn shoot(&mut self) -> Option<bullet::Bullet> {
@@ -75,6 +69,11 @@ impl Player {
         self.shoot_direction = direction;
     }
 
+    pub fn set_target(&mut self, target: Point2) {
+        self.target = Some(target);
+        self.shoot_direction = target - self.position;
+    }
+
     pub fn set_movement(&mut self, direction: Vector2) {
         if let Some(unit_vector) = direction.try_normalize(0.0) {
             self.physics
@@ -84,14 +83,13 @@ impl Player {
         }
     }
 }
-
-impl HasHitbox for Player {
+impl HasHitbox for Mob {
     fn get_hitbox(&self) -> &Hitbox {
         &self.hitbox
     }
 }
 
-impl HasPhysics for Player {
+impl HasPhysics for Mob {
     fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
         let p = collision.get_penetration();
         self.position -= p;
@@ -105,7 +103,24 @@ impl HasPhysics for Player {
     }
 }
 
-impl Renderable for Player {
+impl HasCollisionEvents for Mob {
+    fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event> {
+        if super::collision::is_intersecting(self, object) {
+        if self.blacklist.iter().any(|x| *x == object.get_id()) {
+                let mut effects = Vec::new();
+                effects.push(Event::Damage(1));
+                effects.push(Event::Impulse(2000.0 * (object.get_position() - self.get_position()).normalize()));
+                effects
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+impl Renderable for Mob {
     fn get_drawable_asset(&self) -> DrawableAsset {
         self.mesh
     }
@@ -119,7 +134,7 @@ impl Renderable for Player {
     }
 }
 
-impl CanRecieveEvents for Player {
+impl CanRecieveEvents for Mob {
     fn recieve_event(&mut self, _dt: f32, event: Event) {
         match event {
             Event::Damage(damage) => {
@@ -132,7 +147,7 @@ impl CanRecieveEvents for Player {
     }
 }
 
-impl Object for Player {
+impl Object for Mob {
     fn get_id(&self) -> ObjectID {
         self.id
     }
