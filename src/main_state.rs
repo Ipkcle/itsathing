@@ -23,17 +23,17 @@ pub enum DirectionInputScalar {
 
 impl DirectionInputScalar {
     pub fn get_value(&self) -> f32 {
-        match self {
-            Positive => 1.0,
-            Negative => -1.0,
+        match *self {
+            DirectionInputScalar::Positive => 1.0,
+            DirectionInputScalar::Negative => -1.0,
         }
     }
 }
 
 #[derive(Clone, Copy)]
 pub enum Axis {
-    x,
-    y
+    X,
+    Y,
 }
 
 struct DirectionInputStack {
@@ -43,29 +43,41 @@ struct DirectionInputStack {
 
 impl DirectionInputStack {
     pub fn new() -> Self {
-        Self { 
+        Self {
             x_input_stack: Vec::new(),
-            y_input_stack: Vec::new()
+            y_input_stack: Vec::new(),
         }
     }
 
     fn get_input_stack(&mut self, axis: Axis) -> &mut Vec<DirectionInputScalar> {
         match axis {
-            Axis::x => &mut self.x_input_stack,
-            Axis::y => &mut self.y_input_stack
+            Axis::X => &mut self.x_input_stack,
+            Axis::Y => &mut self.y_input_stack,
         }
     }
 
-    pub fn get_direction(&self) -> Vector2 {
+    pub fn get_direction_old(&self) -> Vector2 {
+        let mut x_vec = Vector2::zeros();
+        let mut y_vec = Vector2::zeros();
+        if let Some(x_magnitude) = self.x_input_stack.first() {
+            x_vec = Vector2::new(x_magnitude.get_value(), 0.0);
+        }
+        if let Some(y_magnitude) = self.y_input_stack.first() {
+            y_vec = Vector2::new(0.0, y_magnitude.get_value());
+        }
+        (x_vec + y_vec)
+    }
+
+    pub fn get_direction_recent(&self) -> Vector2 {
         let mut x_vec = Vector2::zeros();
         let mut y_vec = Vector2::zeros();
         if let Some(x_magnitude) = self.x_input_stack.last() {
             x_vec = Vector2::new(x_magnitude.get_value(), 0.0);
         }
         if let Some(y_magnitude) = self.y_input_stack.last() {
-            y_vec = Vector2::new(y_magnitude.get_value(), 0.0);
+            y_vec = Vector2::new(0.0, y_magnitude.get_value());
         }
-        (x_vec + y_vec).normalize()
+        (x_vec + y_vec)
     }
 
     pub fn is_active(&self) -> bool {
@@ -73,7 +85,8 @@ impl DirectionInputStack {
     }
 
     pub fn deactivate_direction(&mut self, direction: DirectionInputScalar, axis: Axis) {
-        self.get_input_stack(axis).retain(|element| *element != direction);
+        self.get_input_stack(axis)
+            .retain(|element| *element != direction);
     }
 
     pub fn activate_direction(&mut self, direction: DirectionInputScalar, axis: Axis) {
@@ -85,30 +98,16 @@ impl DirectionInputStack {
 
 struct Input {
     action: Action,
-    up: bool,
-    down: bool,
-    left: bool,
-    right: bool,
+    pub move_stack: DirectionInputStack,
     pub shoot_stack: DirectionInputStack,
-    shoot_direction: Vector2,
-    x_axis: f32,
-    y_axis: f32,
-    shooting: bool,
 }
 
 impl Input {
     pub fn new() -> Self {
         Self {
             action: Action::None,
-            up: false,
-            down: false,
-            left: false,
-            right: false,
+            move_stack: DirectionInputStack::new(),
             shoot_stack: DirectionInputStack::new(),
-            shoot_direction: Vector2::new(0.0, 0.0),
-            x_axis: 0.0,
-            y_axis: 0.0,
-            shooting: false,
         }
     }
 }
@@ -153,33 +152,11 @@ impl MainState {
     }
 
     fn handle_player_input(&mut self) {
-        match (self.input.up, self.input.down) {
-            (true, false) => {
-                self.input.y_axis = 1.0;
-            }
-            (false, true) => {
-                self.input.y_axis = -1.0;
-            }
-            _ => {
-                self.input.y_axis = 0.0;
-            }
-        }
-        match (self.input.left, self.input.right) {
-            (true, false) => {
-                self.input.x_axis = -1.0;
-            }
-            (false, true) => {
-                self.input.x_axis = 1.0;
-            }
-            _ => {
-                self.input.x_axis = 0.0;
-            }
-        }
         self.player_mob
-            .set_movement(Vector2::new(self.input.x_axis, self.input.y_axis));
+            .set_movement(self.input.move_stack.get_direction_recent());
         self.player_mob
-            .set_shoot_direction(self.input.shoot_direction);
-        if self.input.shooting {
+            .set_shoot_direction(self.input.shoot_stack.get_direction_recent());
+        if self.input.shoot_stack.is_active() {
             match self.player_mob.shoot() {
                 Some(projectile) => self.projectiles.push(projectile),
                 None => (),
@@ -256,10 +233,10 @@ impl MainState {
         //Find the pixel position on screen of the object.
         let pos = self.world_to_screen_coords(object.get_position());
 
-//      //If the object is not on screen, do nothing.
-//      if !self.is_on_screen(pos) {
-//          return Ok(());
-//      }
+        //      //If the object is not on screen, do nothing.
+        //      if !self.is_on_screen(pos) {
+        //          return Ok(());
+        //      }
 
         //Draw the drawable component if the object has one, else return an error.
         let d = object.get_drawable_asset();
@@ -348,32 +325,44 @@ impl EventHandler for MainState {
     fn key_down_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
         match keycode {
             Keycode::W => {
-                self.input.up = true;
+                self.input
+                    .move_stack
+                    .activate_direction(DirectionInputScalar::Positive, Axis::Y);
             }
             Keycode::S => {
-                self.input.down = true;
+                self.input
+                    .move_stack
+                    .activate_direction(DirectionInputScalar::Negative, Axis::Y);
             }
             Keycode::A => {
-                self.input.left = true;
+                self.input
+                    .move_stack
+                    .activate_direction(DirectionInputScalar::Negative, Axis::X);
             }
             Keycode::D => {
-                self.input.right = true;
+                self.input
+                    .move_stack
+                    .activate_direction(DirectionInputScalar::Positive, Axis::X);
             }
             Keycode::Up => {
-                self.input.shoot_direction = Vector2::new(0.0, 1.0);
-                self.input.shooting = true;
+                self.input
+                    .shoot_stack
+                    .activate_direction(DirectionInputScalar::Positive, Axis::Y);
             }
             Keycode::Down => {
-                self.input.shoot_direction = Vector2::new(0.0, -1.0);
-                self.input.shooting = true;
+                self.input
+                    .shoot_stack
+                    .activate_direction(DirectionInputScalar::Negative, Axis::Y);
             }
             Keycode::Left => {
-                self.input.shoot_direction = Vector2::new(-1.0, 0.0);
-                self.input.shooting = true;
+                self.input
+                    .shoot_stack
+                    .activate_direction(DirectionInputScalar::Negative, Axis::X);
             }
             Keycode::Right => {
-                self.input.shoot_direction = Vector2::new(1.0, 0.0);
-                self.input.shooting = true;
+                self.input
+                    .shoot_stack
+                    .activate_direction(DirectionInputScalar::Positive, Axis::X);
             }
             Keycode::Escape => ctx.quit().unwrap(),
             _ => (), // Do nothing
@@ -383,28 +372,44 @@ impl EventHandler for MainState {
     fn key_up_event(&mut self, _ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
         match keycode {
             Keycode::W => {
-                self.input.up = false;
+                self.input
+                    .move_stack
+                    .deactivate_direction(DirectionInputScalar::Positive, Axis::Y);
             }
             Keycode::S => {
-                self.input.down = false;
+                self.input
+                    .move_stack
+                    .deactivate_direction(DirectionInputScalar::Negative, Axis::Y);
             }
             Keycode::A => {
-                self.input.left = false;
+                self.input
+                    .move_stack
+                    .deactivate_direction(DirectionInputScalar::Negative, Axis::X);
             }
             Keycode::D => {
-                self.input.right = false;
+                self.input
+                    .move_stack
+                    .deactivate_direction(DirectionInputScalar::Positive, Axis::X);
             }
             Keycode::Up => {
-                self.input.shooting = false;
+                self.input
+                    .shoot_stack
+                    .deactivate_direction(DirectionInputScalar::Positive, Axis::Y);
             }
             Keycode::Down => {
-                self.input.shooting = false;
+                self.input
+                    .shoot_stack
+                    .deactivate_direction(DirectionInputScalar::Negative, Axis::Y);
             }
             Keycode::Left => {
-                self.input.shooting = false;
+                self.input
+                    .shoot_stack
+                    .deactivate_direction(DirectionInputScalar::Negative, Axis::X);
             }
             Keycode::Right => {
-                self.input.shooting = false;
+                self.input
+                    .shoot_stack
+                    .deactivate_direction(DirectionInputScalar::Positive, Axis::X);
             }
             _ => (), // Do nothing
         }
