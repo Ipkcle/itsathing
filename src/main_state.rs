@@ -11,8 +11,76 @@ use game_object::mob::Mob;
 use game_object::bullet::Bullet;
 
 enum Action {
-    None,
     Item,
+    None,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum DirectionInputScalar {
+    Positive,
+    Negative,
+}
+
+impl DirectionInputScalar {
+    pub fn get_value(&self) -> f32 {
+        match self {
+            Positive => 1.0,
+            Negative => -1.0,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum Axis {
+    x,
+    y
+}
+
+struct DirectionInputStack {
+    x_input_stack: Vec<DirectionInputScalar>,
+    y_input_stack: Vec<DirectionInputScalar>,
+}
+
+impl DirectionInputStack {
+    pub fn new() -> Self {
+        Self { 
+            x_input_stack: Vec::new(),
+            y_input_stack: Vec::new()
+        }
+    }
+
+    fn get_input_stack(&mut self, axis: Axis) -> &mut Vec<DirectionInputScalar> {
+        match axis {
+            Axis::x => &mut self.x_input_stack,
+            Axis::y => &mut self.y_input_stack
+        }
+    }
+
+    pub fn get_direction(&self) -> Vector2 {
+        let mut x_vec = Vector2::zeros();
+        let mut y_vec = Vector2::zeros();
+        if let Some(x_magnitude) = self.x_input_stack.last() {
+            x_vec = Vector2::new(x_magnitude.get_value(), 0.0);
+        }
+        if let Some(y_magnitude) = self.y_input_stack.last() {
+            y_vec = Vector2::new(y_magnitude.get_value(), 0.0);
+        }
+        (x_vec + y_vec).normalize()
+    }
+
+    pub fn is_active(&self) -> bool {
+        !(self.x_input_stack.is_empty() && self.y_input_stack.is_empty())
+    }
+
+    pub fn deactivate_direction(&mut self, direction: DirectionInputScalar, axis: Axis) {
+        self.get_input_stack(axis).retain(|element| *element != direction);
+    }
+
+    pub fn activate_direction(&mut self, direction: DirectionInputScalar, axis: Axis) {
+        if !self.get_input_stack(axis).contains(&direction) {
+            self.get_input_stack(axis).push(direction);
+        }
+    }
 }
 
 struct Input {
@@ -21,7 +89,7 @@ struct Input {
     down: bool,
     left: bool,
     right: bool,
-    move_stack: Vec<Vector2>,
+    pub shoot_stack: DirectionInputStack,
     shoot_direction: Vector2,
     x_axis: f32,
     y_axis: f32,
@@ -36,7 +104,7 @@ impl Input {
             down: false,
             left: false,
             right: false,
-            move_stack: Vec::new(),
+            shoot_stack: DirectionInputStack::new(),
             shoot_direction: Vector2::new(0.0, 0.0),
             x_axis: 0.0,
             y_axis: 0.0,
@@ -195,13 +263,14 @@ impl MainState {
 
         //Draw the drawable component if the object has one, else return an error.
         let d = object.get_drawable_asset();
+
         //get the mesh from assets
         let drawable = self.assets.get_drawable(d);
 
         //Set the drawing parameters.
         let drawparams = graphics::DrawParam {
             dest: pos,
-            color: Some(object.get_color()),
+            color: object.get_color(),
             ..Default::default()
         };
 

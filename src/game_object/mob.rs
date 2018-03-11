@@ -30,7 +30,7 @@ impl Mob {
             hitbox: Hitbox::new(Vector2::new(10.0, 10.0)),
             physics: ActorPhysics::new(2.0),
             position,
-            health: 5,
+            health: 15,
             time_since_hurt: 300.0,
             time_since_shot: 300.0,
             id: ObjectID::new(0),
@@ -125,12 +125,12 @@ impl Renderable for Mob {
         self.mesh
     }
 
-    fn get_color(&self) -> Color {
-        if self.time_since_hurt < 0.15 {
+    fn get_color(&self) -> Option<Color> {
+        Some(if self.time_since_hurt < 0.15 {
             Color::new(0.9, 0.4, 0.4, 0.7)
         } else {
             self.color
-        }
+        })
     }
 }
 

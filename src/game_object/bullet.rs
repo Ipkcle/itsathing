@@ -66,8 +66,8 @@ impl Renderable for Bullet {
         self.mesh
     }
 
-    fn get_color(&self) -> Color {
-        self.color
+    fn get_color(&self) -> Option<Color> {
+       Some(self.color)
     }
 }
 

@@ -50,8 +50,8 @@ impl Renderable for Block {
         self.mesh
     }
 
-    fn get_color(&self) -> Color {
-        Color::new(0.3, 0.7, 0.3, 0.7)
+    fn get_color(&self) -> Option<Color> {
+        Some(Color::new(0.3, 0.7, 0.3, 0.7))
     }
 }
 

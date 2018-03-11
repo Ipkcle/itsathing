@@ -28,7 +28,7 @@ impl ObjectID {
 
 pub trait Renderable: Object {
     fn get_drawable_asset(&self) -> DrawableAsset;
-    fn get_color(&self) -> Color;
+    fn get_color(&self) -> Option<Color>;
 }
 
 pub trait HasHitbox: Object {
@@ -72,7 +72,7 @@ pub trait HasPhysics: HasHitbox {
         0.0
     }
 
-    fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
+    fn recieve_collision(&mut self, _dt: f32, _collision: collision::Collision) {
         //do nothing
     }
 }

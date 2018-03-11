@@ -58,7 +58,7 @@ impl Player {
     }
 
     pub fn shoot(&mut self) -> Option<bullet::Bullet> {
-        if self.time_since_shot >= 0.2 {
+        if self.time_since_shot >= 0.10 {
             self.time_since_shot = 0.0;
             Some(bullet::Bullet::new(
                 self.position + 0.5 * self.hitbox.vec(),
@@ -110,12 +110,12 @@ impl Renderable for Player {
         self.mesh
     }
 
-    fn get_color(&self) -> Color {
-        if self.time_since_hurt < 0.15 {
+    fn get_color(&self) -> Option<Color> {
+        Some(if self.time_since_hurt < 0.15 {
             Color::new(0.9, 0.4, 0.4, 0.7)
         } else {
             self.color
-        }
+        })
     }
 }
 
