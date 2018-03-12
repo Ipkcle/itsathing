@@ -138,16 +138,10 @@ impl MainState {
             projectiles: Vec::new(),
             camera: Vector2::new(0.0, 0.0),
         };
-        state.mobs.push(Mob::dummy(Point2::new(100.0, 100.0)));
-        state.mobs.push(Mob::dummy(Point2::new(100.0, -100.0)));
-        state.mobs.push(Mob::dummy(Point2::new(-100.0, -100.0)));
-        state.mobs.push(Mob::dummy(Point2::new(150.0, 150.0)));
-        state.mobs.push(Mob::dummy(Point2::new(150.0, -150.0)));
-        state.mobs.push(Mob::dummy(Point2::new(-150.0, -150.0)));
-        state.blocks.push(Block::wallh(-190.0, 200.0));
+        state.blocks.push(Block::wallh(-170.0, 200.0));
         state.blocks.push(Block::wallh(-190.0, -200.0));
-        state.blocks.push(Block::wallv(200.0, -200.0));
-        state.blocks.push(Block::wallv(-200.0, -200.0));
+        state.blocks.push(Block::wallv(210.0, -200.0));
+        state.blocks.push(Block::wallv(-190.0, -180.0));
         Ok(state)
     }
 
@@ -188,6 +182,17 @@ impl MainState {
         }
     }
 
+    fn reset(&mut self) {
+        self.player_mob = player::Player::new();
+        self.mobs.drain(..);
+        self.projectiles.drain(..);
+        self.mobs.push(Mob::dummy(Point2::new(100.0, 100.0)));
+        self.mobs.push(Mob::dummy(Point2::new(100.0, -100.0)));
+        self.mobs.push(Mob::dummy(Point2::new(-100.0, -100.0)));
+        self.mobs.push(Mob::dummy(Point2::new(150.0, 150.0)));
+        self.mobs.push(Mob::dummy(Point2::new(150.0, -150.0)));
+        self.mobs.push(Mob::dummy(Point2::new(-150.0, -150.0)));
+    }
     fn calculate_ai(&mut self) {
         for object in &mut self.mobs {
             object.set_target(self.player_mob.get_position());
