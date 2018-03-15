@@ -8,19 +8,19 @@ use super::*;
 use assets::DrawableAsset;
 
 pub struct BasicCuboid {
-    walk_acceleration: f32,
-    mesh: DrawableAsset,
-    hitbox: Hitbox,
-    physics: ActorPhysics,
-    position: Point2,
-    health: i32,
-    time_since_hurt: f32,
-    time_since_shot: f32,
-    id: ObjectID,
-    color: Color,
-    target: Option<Point2>,
-    shoot_direction: Vector2,
-    blacklist: Vec<ObjectID>,
+    pub walk_acceleration: f32,
+    pub mesh: DrawableAsset,
+    pub hitbox: Hitbox,
+    pub physics: ActorPhysics,
+    pub position: Point2,
+    pub health: i32,
+    pub time_since_hurt: f32,
+    pub time_since_shot: f32,
+    pub id: ObjectID,
+    pub color: Color,
+    pub target: Option<Point2>,
+    pub shoot_direction: Vector2,
+    pub blacklist: Vec<ObjectID>,
 }
 
 impl BasicCuboid {

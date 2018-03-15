@@ -21,20 +21,9 @@ pub trait IsMob {
         + HasCollisionEvents
         + Renderable
         + CanRecieveEvents
-        + CanSetMovement
-        + CanShoot;
+        + CanSetMovement;
     fn get_mob_mut(&mut self) -> &mut Self::Implmementation;
     fn get_mob(&self) -> &Self::Implmementation;
-}
-
-impl<T: IsMob> CanShoot for T {
-    fn shoot(&mut self) -> Option<bullet::Bullet> {
-        self.get_mob_mut().shoot()
-    }
-
-    fn set_shoot_direction(&mut self, direction: Vector2) {
-        self.get_mob_mut().set_shoot_direction(direction);
-    }
 }
 
 impl<T: IsMob> CanSetMovement for T {
