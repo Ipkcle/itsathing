@@ -329,6 +329,9 @@ impl EventHandler for MainState {
 
     fn key_down_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
         match keycode {
+            Keycode::R => {
+                self.reset();
+            }
             Keycode::W => {
                 self.input
                     .move_stack
