@@ -3,33 +3,10 @@ use ggez::graphics::Color;
 use super::physics::ActorPhysics;
 use super::collision::Hitbox;
 use super::event::Event;
+use super::mob::*;
 use super::*;
 use assets::DrawableAsset;
 
-pub trait IsMob {
-    type Implmementation: HasPhysics + HasCollisionEvents + Renderable + CanRecieveEvents;
-    fn get_mob(&self) -> Self::Implmementation;
-}
-
-impl<T> Object for T where T: IsMob {
-
-}
-
-impl<T> HasHitbox for T where T: IsMob {
-    fn get_hitbox(&self) -> &Hitbox {
-        self.get_mob().get_hitbox()
-    }
-}
-
-impl<T> HasPhysics for T where T: IsMob {
-    fn get_elasticity(&self) -> f32 {
-        self.get_mob().get_elasticity()
-    }
-
-    fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
-        self.get_mob().recieve_collision(dt, collision);
-    }
-}
 pub struct BasicCuboid {
     walk_acceleration: f32,
     mesh: DrawableAsset,
@@ -47,35 +24,41 @@ pub struct BasicCuboid {
 }
 
 impl BasicCuboid {
-    pub fn dummy(position: Point2) -> Self {
-        BasicCuboid {
-            walk_acceleration: 1000.0,
-            mesh: DrawableAsset::Player,
-            hitbox: Hitbox::new(Vector2::new(10.0, 10.0)),
-            physics: ActorPhysics::new(2.0),
+    pub fn new(
+        walk_acceleration: f32,
+        mesh: DrawableAsset,
+        hitbox_vec: Vector2,
+        drag_constant: f32,
+        position: Point2,
+        health: i32,
+        id: ObjectID,
+        color: Color,
+    ) -> Self {
+        Self {
+            walk_acceleration,
+            mesh,
+            hitbox: Hitbox::new(hitbox_vec),
+            physics: ActorPhysics::new(drag_constant),
             position,
-            health: 15,
+            health,
             time_since_hurt: 300.0,
             time_since_shot: 300.0,
-            id: ObjectID::new(0),
-            color: Color::from((222, 184, 135, 200)),
-            target: Some(Point2::new(0.0, 0.0)),
+            id,
+            color,
+            target: None,
             shoot_direction: Vector2::new(0.0, 0.0),
             blacklist: vec![ObjectID::new(1)],
         }
     }
-
     fn update_position(&mut self, dt: f32) {
         if self.physics.get_velocity().norm() > 10.0 {
             self.position += self.physics.get_velocity() * dt;
         }
     }
+}
 
-    fn get_effects(&self) {
-
-    }
-
-    pub fn shoot(&mut self) -> Option<bullet::Bullet> {
+impl CanShoot for BasicCuboid {
+    fn shoot(&mut self) -> Option<bullet::Bullet> {
         if self.time_since_shot >= 0.2 {
             self.time_since_shot = 0.0;
             Some(bullet::Bullet::new(
@@ -89,16 +72,18 @@ impl BasicCuboid {
         }
     }
 
-    pub fn set_shoot_direction(&mut self, direction: Vector2) {
+    fn set_shoot_direction(&mut self, direction: Vector2) {
         self.shoot_direction = direction;
     }
+}
 
-    pub fn set_target(&mut self, target: Point2) {
+impl CanSetMovement for BasicCuboid {
+    fn set_target(&mut self, target: Point2) {
         self.target = Some(target);
         self.shoot_direction = target - self.position;
     }
 
-    pub fn set_movement(&mut self, direction: Vector2) {
+    fn set_movement(&mut self, direction: Vector2) {
         if let Some(unit_vector) = direction.try_normalize(0.0) {
             self.physics
                 .set_acceleration(self.walk_acceleration * unit_vector);
@@ -107,9 +92,14 @@ impl BasicCuboid {
         }
     }
 }
+impl HasHitbox for BasicCuboid {
+    fn get_hitbox(&self) -> &Hitbox {
+        &self.hitbox
+    }
+}
 
 impl HasPhysics for BasicCuboid {
-    fn recieve_collision(&mut self, dt: f32, collision: collision::Collision) {
+    fn recieve_collision(&mut self, _dt: f32, collision: collision::Collision) {
         let p = collision.get_penetration();
         self.position -= p;
         let mut v = self.physics.get_velocity();
@@ -125,10 +115,12 @@ impl HasPhysics for BasicCuboid {
 impl HasCollisionEvents for BasicCuboid {
     fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event> {
         if super::collision::is_intersecting(self, object) {
-        if self.blacklist.iter().any(|x| *x == object.get_id()) {
+            if self.blacklist.iter().any(|x| *x == object.get_id()) {
                 let mut effects = Vec::new();
                 effects.push(Event::Damage(1));
-                effects.push(Event::Impulse(2000.0 * (object.get_position() - self.get_position()).normalize()));
+                effects.push(Event::Impulse(
+                    2000.0 * (object.get_position() - self.get_position()).normalize(),
+                ));
                 effects
             } else {
                 Vec::new()
@@ -136,12 +128,6 @@ impl HasCollisionEvents for BasicCuboid {
         } else {
             Vec::new()
         }
-    }
-}
-
-impl HasBoundingBox for BasicCuboid {
-    fn get_bounding_box(&self) -> Vector2 {
-        self.hitbox.vec()
     }
 }
 

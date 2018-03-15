@@ -7,7 +7,7 @@ use assets::Assets;
 use game_object;
 use game_object::*;
 use game_object::block::Block;
-use game_object::mob::Mob;
+use game_object::mob::*;
 use game_object::bullet::Bullet;
 
 enum Action {

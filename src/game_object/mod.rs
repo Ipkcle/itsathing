@@ -45,7 +45,7 @@ impl<T> HasBoundingBox for T where T: HasHitbox {
 }
 
 pub trait HasHitbox: Object {
-    fn get_hitbox(&self) -> Hitbox;
+    fn get_hitbox(&self) -> &Hitbox;
 }
 
 pub trait HasCollisionEvents: HasHitbox {
