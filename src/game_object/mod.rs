@@ -5,8 +5,10 @@ pub mod collision;
 pub mod player;
 pub mod mob;
 pub mod block;
+pub mod basic_cuboid;
 
 use ggez::graphics::Point2;
+use ggez::graphics::Vector2;
 use ggez::graphics::Color;
 use self::collision::Hitbox;
 use self::event::Event;
@@ -26,13 +28,24 @@ impl ObjectID {
     }
 }
 
-pub trait Renderable: Object {
+
+pub trait Renderable: HasBoundingBox {
     fn get_drawable_asset(&self) -> DrawableAsset;
     fn get_color(&self) -> Option<Color>;
 }
 
+pub trait HasBoundingBox: Object {
+    fn get_bounding_box(&self) -> Vector2;
+}
+
+impl<T> HasBoundingBox for T where T: HasHitbox {
+    fn get_bounding_box(&self) -> Vector2 {
+        self.get_hitbox().vec()
+    }
+}
+
 pub trait HasHitbox: Object {
-    fn get_hitbox(&self) -> &Hitbox;
+    fn get_hitbox(&self) -> Hitbox;
 }
 
 pub trait HasCollisionEvents: HasHitbox {
@@ -76,6 +89,7 @@ pub trait HasPhysics: HasHitbox {
         //do nothing
     }
 }
+
 
 pub trait CanRecieveEvents: Object {
     fn recieve_event(&mut self, dt: f32, event: Event);

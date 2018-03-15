@@ -5,6 +5,7 @@ use super::collision::Hitbox;
 use super::event::Event;
 use super::Object;
 use super::HasHitbox;
+use super::HasBoundingBox;
 use super::HasPhysics;
 use super::CanRecieveEvents;
 use super::Renderable;
