@@ -1,8 +1,15 @@
 use ggez::graphics::{Vector2};
 
+//enums
 enum Action {
     Item,
     None,
+}
+
+#[derive(Clone, Copy)]
+pub enum Axis {
+    X,
+    Y,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -20,12 +27,8 @@ impl DirectionInputScalar {
     }
 }
 
-#[derive(Clone, Copy)]
-pub enum Axis {
-    X,
-    Y,
-}
 
+// DirectionInputStack struct
 pub struct DirectionInputStack {
     x_input_stack: Vec<DirectionInputScalar>,
     y_input_stack: Vec<DirectionInputScalar>,
@@ -86,6 +89,7 @@ impl DirectionInputStack {
     }
 }
 
+//Input struct
 pub struct Input {
     action: Action,
     pub move_stack: DirectionInputStack,

@@ -14,6 +14,7 @@ use self::collision::Hitbox;
 use self::event::Event;
 use assets::DrawableAsset;
 
+// structs
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ObjectID {
     value: u32,
@@ -27,6 +28,8 @@ impl ObjectID {
         self.value
     }
 }
+
+//traits
 
 pub trait CanSetMoveTarget: Object {
     fn set_target(&mut self, target: Point2);
@@ -49,12 +52,6 @@ pub trait HasBoundingBox: Object {
     }
 }
 
-impl<T> HasBoundingBox for T where T: HasHitbox {
-    fn get_bounding_box(&self) -> Vector2 {
-        self.get_hitbox().vec()
-    }
-}
-
 pub trait HasHitbox: Object {
     fn get_hitbox(&self) -> &Hitbox;
 }
@@ -64,6 +61,43 @@ pub trait HasCollisionEvents: HasHitbox {
         -> Vec<Event>;
 }
 
+pub trait CanRecieveEvents: Object {
+    fn recieve_event(&mut self, dt: f32, event: Event);
+
+    fn recieve_events(&mut self, dt: f32, events: Vec<Event>) {
+        for event in events {
+            self.recieve_event(dt, event);
+        }
+    }
+}
+
+pub trait Object {
+    fn get_position(&self) -> Point2;
+
+    fn step(&mut self, _dt: f32) {
+        //do nothing
+    }
+
+    fn should_delete(&self) -> bool {
+        false
+    }
+
+    fn get_id(&self) -> ObjectID {
+        ObjectID::new(0)
+    }
+}
+
+//impl blocks
+impl<T> HasBoundingBox for T
+where
+    T: HasHitbox,
+{
+    fn get_bounding_box(&self) -> Vector2 {
+        self.get_hitbox().vec()
+    }
+}
+
+//functions
 pub fn object_vec_collision_events<T: HasHitbox + CanRecieveEvents, U: HasCollisionEvents>(
     dt: f32,
     object_1: &mut T,
@@ -98,32 +132,5 @@ pub trait HasPhysics: HasHitbox {
 
     fn recieve_collision(&mut self, _dt: f32, _collision: collision::Collision) {
         //do nothing
-    }
-}
-
-
-pub trait CanRecieveEvents: Object {
-    fn recieve_event(&mut self, dt: f32, event: Event);
-
-    fn recieve_events(&mut self, dt: f32, events: Vec<Event>) {
-        for event in events {
-            self.recieve_event(dt, event);
-        }
-    }
-}
-
-pub trait Object {
-    fn get_position(&self) -> Point2;
-
-    fn step(&mut self, _dt: f32) {
-        //do nothing
-    }
-
-    fn should_delete(&self) -> bool {
-        false
-    }
-
-    fn get_id(&self) -> ObjectID {
-        ObjectID::new(0)
     }
 }

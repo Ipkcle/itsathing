@@ -68,6 +68,7 @@ impl CanShoot for Player {
         }
     }
 }
+
 impl IsMob for Player {
     type Implmementation = BasicCuboid;
     fn pre_step(&mut self, dt: f32) {
