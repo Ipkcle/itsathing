@@ -6,33 +6,15 @@ use super::basic_cuboid::BasicCuboid;
 use super::*;
 use assets::DrawableAsset;
 
-pub trait CanSetMovement {
-    fn set_target(&mut self, target: Point2);
-    fn set_movement(&mut self, direction: Vector2);
-}
-
-pub trait CanShoot {
-    fn shoot(&mut self) -> Option<bullet::Bullet>;
-    fn set_shoot_direction(&mut self, direction: Vector2);
-}
-
 pub trait IsMob {
-    type Implmementation: HasPhysics
-        + HasCollisionEvents
-        + Renderable
-        + CanRecieveEvents
-        + CanSetMovement;
+    type Implmementation: HasPhysics + Renderable + CanRecieveEvents;
     fn get_mob_mut(&mut self) -> &mut Self::Implmementation;
     fn get_mob(&self) -> &Self::Implmementation;
-}
-
-impl<T: IsMob> CanSetMovement for T {
-    fn set_movement(&mut self, direction: Vector2) {
-        self.get_mob_mut().set_movement(direction);
+    fn pre_step(&mut self, _dt: f32) {
+        /* do nothing */
     }
-
-    fn set_target(&mut self, target: Point2) {
-        self.get_mob_mut().set_target(target);
+    fn post_step(&mut self, _dt: f32) {
+        /* do nothing */
     }
 }
 
@@ -42,7 +24,9 @@ impl<T: IsMob> Object for T {
     }
 
     fn step(&mut self, dt: f32) {
+        self.pre_step(dt);
         self.get_mob_mut().step(dt);
+        self.post_step(dt);
     }
 
     fn should_delete(&self) -> bool {
@@ -80,15 +64,6 @@ impl<T: IsMob> Renderable for T {
     }
 }
 
-impl<T: IsMob> HasCollisionEvents for T {
-    fn create_collision_event<O: HasHitbox + CanRecieveEvents>(
-        &mut self,
-        object: &O,
-    ) -> Vec<Event> {
-        self.get_mob_mut().create_collision_event(object)
-    }
-}
-
 impl<T: IsMob> CanRecieveEvents for T {
     fn recieve_event(&mut self, dt: f32, event: Event) {
         self.get_mob_mut().recieve_event(dt, event);
@@ -99,13 +74,15 @@ impl<T: IsMob> CanRecieveEvents for T {
     }
 }
 
-pub struct Mob {
+pub struct Dummy {
     implementation: BasicCuboid,
+    blacklist: Vec<ObjectID>,
+    target: Option<Point2>,
 }
 
-impl Mob {
-    pub fn dummy(position: Point2) -> Self {
-        Self {
+impl Dummy {
+    pub fn new(position: Point2) -> Self {
+        Dummy {
             implementation: BasicCuboid::new(
                 1000.0,
                 DrawableAsset::Player,
@@ -116,12 +93,45 @@ impl Mob {
                 ObjectID::new(0),
                 Color::from((222, 184, 135, 200)),
             ),
+            blacklist: vec![ObjectID::new(1)],
+            target: None,
         }
     }
 }
 
-impl IsMob for Mob {
+impl HasCollisionEvents for Dummy {
+    fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event> {
+        if super::collision::is_intersecting(self, object) {
+            if self.blacklist.iter().any(|x| *x == object.get_id()) {
+                let mut effects = Vec::new();
+                effects.push(Event::Damage(1));
+                effects.push(Event::Impulse(
+                    2000.0 * (object.get_position() - self.get_position()).normalize(),
+                ));
+                effects
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+impl CanSetMoveTarget for Dummy {
+    fn set_target(&mut self, target: Point2) {
+        self.target = Some(target);
+    }
+}
+
+impl IsMob for Dummy {
     type Implmementation = BasicCuboid;
+    fn post_step(&mut self, _dt: f32) {
+        if let Some(t) = self.target {
+            let pos = self.get_position();
+            self.implementation.set_movement(t - pos);
+        }
+    }
     fn get_mob_mut(&mut self) -> &mut Self::Implmementation {
         &mut self.implementation
     }

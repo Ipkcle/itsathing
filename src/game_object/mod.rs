@@ -28,6 +28,13 @@ impl ObjectID {
     }
 }
 
+pub trait CanSetMoveTarget: Object {
+    fn set_target(&mut self, target: Point2);
+}
+
+pub trait CanShoot: Object {
+    fn shoot(&mut self) -> Option<bullet::Bullet>;
+}
 
 pub trait Renderable: HasBoundingBox {
     fn get_drawable_asset(&self) -> DrawableAsset;
@@ -36,6 +43,10 @@ pub trait Renderable: HasBoundingBox {
 
 pub trait HasBoundingBox: Object {
     fn get_bounding_box(&self) -> Vector2;
+
+    fn get_center_position(&self) -> Point2 {
+        self.get_position() + 0.5 * self.get_bounding_box()
+    }
 }
 
 impl<T> HasBoundingBox for T where T: HasHitbox {

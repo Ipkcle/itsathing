@@ -24,7 +24,7 @@ pub struct MainState {
     assets: Assets,
     player_mob: player::Player,
     //  player_gun:
-    mobs: Vec<Mob>,
+    mobs: Vec<Dummy>,
     blocks: Vec<Block>,
     projectiles: Vec<Bullet>,
     camera: Vector2,
@@ -95,12 +95,12 @@ impl MainState {
         self.player_mob = player::Player::new();
         self.mobs.drain(..);
         self.projectiles.drain(..);
-        self.mobs.push(Mob::dummy(Point2::new(100.0, 100.0)));
-        self.mobs.push(Mob::dummy(Point2::new(100.0, -100.0)));
-        self.mobs.push(Mob::dummy(Point2::new(-100.0, -100.0)));
-        self.mobs.push(Mob::dummy(Point2::new(150.0, 150.0)));
-        self.mobs.push(Mob::dummy(Point2::new(150.0, -150.0)));
-        self.mobs.push(Mob::dummy(Point2::new(-150.0, -150.0)));
+        self.mobs.push(Dummy::new(Point2::new(100.0, 100.0)));
+        self.mobs.push(Dummy::new(Point2::new(100.0, -100.0)));
+        self.mobs.push(Dummy::new(Point2::new(-100.0, -100.0)));
+        self.mobs.push(Dummy::new(Point2::new(150.0, 150.0)));
+        self.mobs.push(Dummy::new(Point2::new(150.0, -150.0)));
+        self.mobs.push(Dummy::new(Point2::new(-150.0, -150.0)));
     }
 
     fn calculate_ai(&mut self) {

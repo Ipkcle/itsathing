@@ -10,6 +10,8 @@ use assets::DrawableAsset;
 
 pub struct Player {
     implementation: BasicCuboid,
+    time_since_shot: f32,
+    shoot_direction: Vector2,
 }
 
 impl Player {
@@ -37,14 +39,27 @@ impl Player {
                 ObjectID::new(1),
                 Color::new(0.3, 0.7, 0.7, 0.7),
             ),
+            time_since_shot: 300.0,
+            shoot_direction: Vector2::new(0.0, 0.0),
         }
     }
-    pub fn shoot(&mut self) -> Option<bullet::Bullet> {
-        if self.implementation.time_since_shot >= 0.10 {
-            self.implementation.time_since_shot = 0.0;
+
+    pub fn set_movement(&mut self, direction: Vector2) {
+        self.implementation.set_movement(direction);
+    }
+
+    pub fn set_shoot_direction(&mut self, direction: Vector2) {
+        self.shoot_direction = direction;
+    }
+}
+
+impl CanShoot for Player {
+    fn shoot(&mut self) -> Option<bullet::Bullet> {
+        if self.time_since_shot >= 0.10 {
+            self.time_since_shot = 0.0;
             Some(bullet::Bullet::new(
-                self.implementation.position + 0.5 * self.implementation.hitbox.vec(),
-                500.0 * self.implementation.shoot_direction.normalize(),
+                self.get_center_position(),
+                500.0 * self.shoot_direction.normalize(),
                 Color::new(0.9, 0.9, 0.9, 1.0),
                 vec![self.get_id()],
             ))
@@ -52,14 +67,14 @@ impl Player {
             None
         }
     }
-
-    pub fn set_shoot_direction(&mut self, direction: Vector2) {
-        self.implementation.shoot_direction = direction;
-    }
 }
-
 impl IsMob for Player {
     type Implmementation = BasicCuboid;
+    fn pre_step(&mut self, dt: f32) {
+        if self.time_since_shot < 200.0 {
+            self.time_since_shot += dt;
+        }
+    }
     fn get_mob_mut(&mut self) -> &mut Self::Implmementation {
         &mut self.implementation
     }
