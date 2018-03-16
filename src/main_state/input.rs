@@ -85,3 +85,19 @@ impl DirectionInputStack {
         }
     }
 }
+
+pub struct Input {
+    action: Action,
+    pub move_stack: DirectionInputStack,
+    pub shoot_stack: DirectionInputStack,
+}
+
+impl Input {
+    pub fn new() -> Self {
+        Self {
+            action: Action::None,
+            move_stack: DirectionInputStack::new(),
+            shoot_stack: DirectionInputStack::new(),
+        }
+    }
+}
