@@ -1,5 +1,6 @@
 use ggez::{Context, GameResult};
 use ggez::graphics::{Point2, Vector2};
+use ggez::graphics::Image;
 use ggez::graphics;
 use ggez::event::*;
 use ggez::timer;
@@ -10,107 +11,11 @@ use game_object::block::Block;
 use game_object::mob::*;
 use game_object::bullet::Bullet;
 
-enum Action {
-    Item,
-    None,
-}
+mod debug;
+mod input;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum DirectionInputScalar {
-    Positive,
-    Negative,
-}
-
-impl DirectionInputScalar {
-    pub fn get_value(&self) -> f32 {
-        match *self {
-            DirectionInputScalar::Positive => 1.0,
-            DirectionInputScalar::Negative => -1.0,
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum Axis {
-    X,
-    Y,
-}
-
-struct DirectionInputStack {
-    x_input_stack: Vec<DirectionInputScalar>,
-    y_input_stack: Vec<DirectionInputScalar>,
-}
-
-impl DirectionInputStack {
-    pub fn new() -> Self {
-        Self {
-            x_input_stack: Vec::new(),
-            y_input_stack: Vec::new(),
-        }
-    }
-
-    fn get_input_stack(&mut self, axis: Axis) -> &mut Vec<DirectionInputScalar> {
-        match axis {
-            Axis::X => &mut self.x_input_stack,
-            Axis::Y => &mut self.y_input_stack,
-        }
-    }
-
-    pub fn get_direction_old(&self) -> Vector2 {
-        let mut x_vec = Vector2::zeros();
-        let mut y_vec = Vector2::zeros();
-        if let Some(x_magnitude) = self.x_input_stack.first() {
-            x_vec = Vector2::new(x_magnitude.get_value(), 0.0);
-        }
-        if let Some(y_magnitude) = self.y_input_stack.first() {
-            y_vec = Vector2::new(0.0, y_magnitude.get_value());
-        }
-        (x_vec + y_vec)
-    }
-
-    pub fn get_direction_recent(&self) -> Vector2 {
-        let mut x_vec = Vector2::zeros();
-        let mut y_vec = Vector2::zeros();
-        if let Some(x_magnitude) = self.x_input_stack.last() {
-            x_vec = Vector2::new(x_magnitude.get_value(), 0.0);
-        }
-        if let Some(y_magnitude) = self.y_input_stack.last() {
-            y_vec = Vector2::new(0.0, y_magnitude.get_value());
-        }
-        (x_vec + y_vec)
-    }
-
-    pub fn is_active(&self) -> bool {
-        !(self.x_input_stack.is_empty() && self.y_input_stack.is_empty())
-    }
-
-    pub fn deactivate_direction(&mut self, direction: DirectionInputScalar, axis: Axis) {
-        self.get_input_stack(axis)
-            .retain(|element| *element != direction);
-    }
-
-    pub fn activate_direction(&mut self, direction: DirectionInputScalar, axis: Axis) {
-        if !self.get_input_stack(axis).contains(&direction) {
-            self.get_input_stack(axis).push(direction);
-        }
-    }
-}
-
-struct Input {
-    action: Action,
-    pub move_stack: DirectionInputStack,
-    pub shoot_stack: DirectionInputStack,
-}
-
-impl Input {
-    pub fn new() -> Self {
-        Self {
-            action: Action::None,
-            move_stack: DirectionInputStack::new(),
-            shoot_stack: DirectionInputStack::new(),
-        }
-    }
-}
+use self::input::*;
+use self::input::Axis;
 
 pub struct MainState {
     screen_w: u32,
@@ -123,6 +28,8 @@ pub struct MainState {
     blocks: Vec<Block>,
     projectiles: Vec<Bullet>,
     camera: Vector2,
+    fps: u16,
+    draw_fps: Option<Image>,
 }
 
 impl MainState {
@@ -137,6 +44,8 @@ impl MainState {
             blocks: Vec::new(),
             projectiles: Vec::new(),
             camera: Vector2::new(0.0, 0.0),
+            fps: 0,
+            draw_fps: None
         };
         state.blocks.push(Block::wallh(-170.0, 200.0));
         state.blocks.push(Block::wallh(-190.0, -200.0));
@@ -193,6 +102,7 @@ impl MainState {
         self.mobs.push(Mob::dummy(Point2::new(150.0, -150.0)));
         self.mobs.push(Mob::dummy(Point2::new(-150.0, -150.0)));
     }
+
     fn calculate_ai(&mut self) {
         for object in &mut self.mobs {
             object.set_target(self.player_mob.get_position());
@@ -220,7 +130,7 @@ impl MainState {
         Point2::new(x, y)
     }
 
-    fn is_on_screen(&self, point: Point2) -> bool {
+    fn _is_on_screen(&self, point: Point2) -> bool {
         (point.x >= 0.0 && point.x <= self.screen_w as f32 && point.y > 0.0
             && point.y < self.screen_h as f32)
     }
@@ -281,20 +191,26 @@ impl EventHandler for MainState {
         //clear the contex
         graphics::clear(ctx);
 
-        //awful fps display
-        /*
-        let fps = &timer::get_fps(ctx).to_string();
-        graphics::Text::new(ctx, fps, &graphics::Font::default_font().unwrap())
-            .unwrap()
-            .draw_ex(
+        let fps = timer::get_fps(ctx) as u16;
+        if fps != self.fps {
+            self.fps = fps;
+            let fps_string = &fps.to_string();
+            self.draw_fps = Some(
+                graphics::Text::new(ctx, fps_string, &graphics::Font::default_font().unwrap())
+                    .unwrap()
+                    .into_inner(),
+            );
+        }
+        if let Some(ref f) = self.draw_fps {
+            graphics::draw_ex(
                 ctx,
+                f,
                 graphics::DrawParam {
                     dest: Point2::new(0.0, 0.0),
                     ..Default::default()
                 },
-            )
-            .unwrap();
-            */
+            ).unwrap();
+        }
 
         //draw the player
         if let Err(error) = self.draw_object(ctx, &self.player_mob) {
