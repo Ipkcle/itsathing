@@ -1,6 +1,5 @@
 use ggez::graphics::Vector2;
 use super::HasHitbox;
-use super::HasCollisionEvents;
 use super::HasPhysics;
 use super::Object;
 use utils::get_two;
@@ -59,10 +58,7 @@ pub fn is_intersecting<T: HasHitbox, U: HasHitbox>(object_1: &T, object_2: &U) -
     (dx1 > 0.0) & (dx2 > 0.0) & (dy1 > 0.0) & (dy2 > 0.0)
 }
 
-pub fn find_penetration<T: HasHitbox, U: HasHitbox>(
-    object_1: &T,
-    object_2: &U,
-) -> Vector2 {
+pub fn find_penetration<T: HasHitbox, U: HasHitbox>(object_1: &T, object_2: &U) -> Vector2 {
     let (hitbox_1, hitbox_2) = (object_1.get_hitbox(), object_2.get_hitbox());
     let (position_1, position_2) = (object_1.get_position(), object_2.get_position());
     let h1 = position_1 + hitbox_1.vec();
@@ -96,7 +92,11 @@ pub fn create_collision<T: HasPhysics, U: HasPhysics>(object_1: &T, object_2: &U
     Collision::new(find_penetration(object_1, object_2))
 }
 
-pub fn object_vec_physics<T: HasPhysics, U: HasPhysics>(dt: f32, object_1: &mut T, list: &mut Vec<U>) {
+pub fn object_vec_physics<T: HasPhysics, U: HasPhysics>(
+    dt: f32,
+    object_1: &mut T,
+    list: &mut Vec<U>,
+) {
     for object_2 in list.iter_mut() {
         let collision = create_collision(object_1, object_2);
         object_1.recieve_collision(dt, collision);
@@ -116,10 +116,7 @@ pub fn vec_vec_physics<T: HasPhysics, U: HasPhysics>(
     }
 }
 
-pub fn vec_physics<T: HasPhysics>(
-    dt: f32,
-    list: &mut Vec<T>,
-) {
+pub fn vec_physics<T: HasPhysics>(dt: f32, list: &mut Vec<T>) {
     let n = list.len();
     for x in 0..n {
         for y in 0..n {

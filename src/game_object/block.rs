@@ -1,17 +1,11 @@
 use ggez::graphics::{Point2, Vector2};
 use ggez::graphics::Color;
-use super::physics::ActorPhysics;
 use super::collision::Hitbox;
-use super::event::Event;
 use super::Object;
 use super::HasHitbox;
-use super::HasBoundingBox;
 use super::HasPhysics;
-use super::CanRecieveEvents;
 use super::Renderable;
-use super::ObjectID;
 use assets::DrawableAsset;
-use super::bullet;
 
 pub struct Block {
     mesh: DrawableAsset,
