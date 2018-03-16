@@ -4,7 +4,7 @@ use ggez::Context;
 use ggez::graphics;
 use ggez::graphics::Image;
 
-const SEPERATOR: String = ": ".to_owned();
+const SEPERATOR: &str = ":";
 
 pub struct DebugTable {
     position: Point2,
@@ -14,23 +14,28 @@ pub struct DebugTable {
 
 impl DebugTable {
     pub fn new(ctx: &mut Context, position: Point2) -> DebugTable {
-        let t = DebugTable { 
+        let mut t = DebugTable { 
             position,
             data: HashMap::new(),
             images: HashMap::new(),
         };
-        let colon_image = DebugTable::make_image_from(ctx, &SEPERATOR[..]);
-        t.images.insert(SEPERATOR, colon_image);
+        let colon_image = DebugTable::make_image_from(ctx, SEPERATOR);
+        t.images.insert(SEPERATOR.to_owned(), colon_image);
         t
     }
     pub fn update(&mut self, label: String, data: String) {}
 
-    pub fn render(&self, ctx: &mut Context) {
-        let cursor = self.position;
+    pub fn render(&mut self, ctx: &mut Context) {
+        let mut cursor = self.position.clone();
+        let mut lables = Vec::new();
         for label in self.data.keys() {
-            self.draw_text(ctx, label, &mut cursor, false);
-            self.draw_text(ctx, &SEPERATOR[..], &mut cursor, false);
-            self.draw_text(ctx, self.data.get(label), &mut cursor, false);
+            lables.push(label.clone());
+        }
+        for label in lables {
+            self.draw_text(ctx, &label[..], &mut cursor, false);
+            self.draw_text(ctx, SEPERATOR, &mut cursor, false);
+            let value = &self.data.get(&label).unwrap().clone()[..];
+            self.draw_text(ctx, value, &mut cursor, true);
         }
     }
 
