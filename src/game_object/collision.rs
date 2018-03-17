@@ -116,6 +116,7 @@ pub fn vec_vec_physics<T: HasPhysics, U: HasPhysics>(
     }
 }
 
+
 pub fn vec_physics<T: HasPhysics>(dt: f32, list: &mut Vec<T>) {
     let n = list.len();
     for x in 0..n {
