@@ -72,14 +72,10 @@ impl Renderable for Bullet {
 }
 
 impl HasCollisionEvents for Bullet {
-    fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event> {
-        if super::collision::is_intersecting(self, object) {
-        if !self.get_whitelist().iter().any(|x| *x == object.get_id()) {
-                self.mark_for_deletion();
-                self.get_effects()
-            } else {
-                Vec::new()
-            }
+    fn create_collision_event(&mut self, id: ObjectID) -> Vec<Event> {
+        if !self.get_whitelist().iter().any(|x| *x == id) {
+            self.mark_for_deletion();
+            self.get_effects()
         } else {
             Vec::new()
         }

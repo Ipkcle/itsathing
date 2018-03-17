@@ -11,6 +11,7 @@ use ggez::graphics::Point2;
 use ggez::graphics::Vector2;
 use ggez::graphics::Color;
 use self::collision::Hitbox;
+use self::collision::is_intersecting;
 use self::event::Event;
 use assets::DrawableAsset;
 
@@ -83,7 +84,7 @@ pub trait CanRecieveEvents: Object {
 }
 
 pub trait HasCollisionEvents: HasHitbox {
-    fn create_collision_event<T: HasHitbox + CanRecieveEvents>(&mut self, object: &T)
+    fn create_collision_event(&mut self, id: ObjectID)
         -> Vec<Event>;
 }
 
@@ -120,9 +121,11 @@ pub fn object_vec_collision_events<T: HasHitbox + CanRecieveEvents, U: HasCollis
     list: &mut Vec<U>,
 ) {
     for object_2 in list.iter_mut() {
-        let events = object_2.create_collision_event(object_1);
-        for event in events {
-            object_1.recieve_event(dt, event);
+        if is_intersecting(object_1, object_2) {
+            let events = object_2.create_collision_event(object_1.get_id());
+            for event in events {
+                object_1.recieve_event(dt, event);
+            }
         }
     }
 }
@@ -134,9 +137,11 @@ pub fn vec_vec_collision_events<T: HasHitbox + CanRecieveEvents, U: HasCollision
 ) {
     for object_1 in objects_1.iter_mut() {
         for object_2 in objects_2.iter_mut() {
-            let events = object_2.create_collision_event(object_1);
-            for event in events {
-                object_1.recieve_event(dt, event);
+            if is_intersecting(object_1, object_2) {
+                let events = object_2.create_collision_event(object_1.get_id());
+                for event in events {
+                    object_1.recieve_event(dt, event);
+                }
             }
         }
     }

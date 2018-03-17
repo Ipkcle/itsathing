@@ -102,6 +102,10 @@ impl CanRecieveEvents for BasicCuboid {
                 self.time_since_hurt = 0.0
             }
             Event::Impulse(vector) => self.physics.add_impulse(vector),
+            Event::ImpulseFrom {
+                from,
+                magnitude,
+            } =>  { self.physics.add_impulse(magnitude*(self.position - from).normalize()) },
         }
     }
 }

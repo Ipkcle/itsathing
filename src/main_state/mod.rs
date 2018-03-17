@@ -16,7 +16,6 @@ mod input;
 
 use self::input::*;
 use self::input::Axis;
-
 pub struct MainState {
     screen_w: u32,
     screen_h: u32,

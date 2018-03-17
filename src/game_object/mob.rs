@@ -100,18 +100,16 @@ impl Dummy {
 }
 
 impl HasCollisionEvents for Dummy {
-    fn create_collision_event<T: HasHitbox>(&mut self, object: &T) -> Vec<Event> {
-        if super::collision::is_intersecting(self, object) {
-            if self.blacklist.iter().any(|x| *x == object.get_id()) {
-                let mut effects = Vec::new();
-                effects.push(Event::Damage(1));
-                effects.push(Event::Impulse(
-                    2000.0 * (object.get_position() - self.get_position()).normalize(),
-                ));
-                effects
-            } else {
-                Vec::new()
-            }
+    fn create_collision_event(&mut self, id: ObjectID) -> Vec<Event> {
+        //TODO move the blacklist thing to the other function place maybe?
+        if self.blacklist.iter().any(|x| *x == id) {
+            let mut effects = Vec::new();
+            effects.push(Event::Damage(1));
+            effects.push(Event::ImpulseFrom {
+                from: self.get_position(),
+                magnitude: 2000.0
+            });
+            effects
         } else {
             Vec::new()
         }
