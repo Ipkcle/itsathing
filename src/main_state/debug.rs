@@ -23,7 +23,9 @@ impl DebugTable {
         t.images.insert(SEPERATOR.to_owned(), colon_image);
         t
     }
-    pub fn update(&mut self, label: String, data: String) {}
+    pub fn load(&mut self, label: String, data: String) {
+        self.data.insert(label, data); 
+    }
 
     pub fn render(&mut self, ctx: &mut Context) {
         let mut cursor = self.position.clone();
@@ -36,6 +38,7 @@ impl DebugTable {
             self.draw_text(ctx, SEPERATOR, &mut cursor, false);
             let value = &self.data.get(&label).unwrap().clone()[..];
             self.draw_text(ctx, value, &mut cursor, true);
+            cursor.x = self.position.x;
         }
     }
 
@@ -51,10 +54,6 @@ impl DebugTable {
     }
 
     fn draw(ctx: &mut Context, image: &Image, cursor: &mut Point2, new_line: bool) {
-        cursor.x += image.width() as f32;
-        if new_line {
-            cursor.y += image.height() as f32;
-        }
         graphics::draw_ex(
             ctx,
             image,
@@ -63,6 +62,10 @@ impl DebugTable {
                 ..Default::default()
             },
         ).unwrap();
+        cursor.x += image.width() as f32;
+        if new_line {
+            cursor.y += image.height() as f32;
+        }
     }
 
     fn make_image_from(ctx: &mut Context, string: &str) -> Image {

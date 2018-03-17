@@ -41,6 +41,9 @@ impl BasicCuboid {
             color,
         }
     }
+    pub fn get_health(&self) -> i32 {
+        self.health
+    }
     pub fn set_movement(&mut self, direction: Vector2) {
         if let Some(unit_vector) = direction.try_normalize(0.0) {
             self.physics

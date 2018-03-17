@@ -28,8 +28,7 @@ pub struct MainState {
     blocks: Vec<Block>,
     projectiles: Vec<Bullet>,
     camera: Vector2,
-    fps: u16,
-    draw_fps: Option<Image>,
+    debug_display: debug::DebugTable,
 }
 
 impl MainState {
@@ -44,8 +43,7 @@ impl MainState {
             blocks: Vec::new(),
             projectiles: Vec::new(),
             camera: Vector2::new(0.0, 0.0),
-            fps: 0,
-            draw_fps: None
+            debug_display: debug::DebugTable::new(ctx, Point2::new(0.0, 0.0)),
         };
         state.blocks.push(Block::wallh(-170.0, 200.0));
         state.blocks.push(Block::wallh(-190.0, -200.0));
@@ -78,6 +76,8 @@ impl MainState {
         for object in &mut self.projectiles {
             object.step(dt);
         }
+        //load player hp to debug display
+        self.debug_display.load("hp".to_owned(), self.player_mob.get_health().to_string());
     }
 
     fn clear_objects(&mut self) {
@@ -191,27 +191,12 @@ impl EventHandler for MainState {
         //clear the contex
         graphics::clear(ctx);
 
+        //load the fps to the debug table
         let fps = timer::get_fps(ctx) as u16;
-        if fps != self.fps {
-            self.fps = fps;
-            let fps_string = &fps.to_string();
-            self.draw_fps = Some(
-                graphics::Text::new(ctx, fps_string, &graphics::Font::default_font().unwrap())
-                    .unwrap()
-                    .into_inner(),
-            );
-        }
-        if let Some(ref f) = self.draw_fps {
-            graphics::draw_ex(
-                ctx,
-                f,
-                graphics::DrawParam {
-                    dest: Point2::new(0.0, 0.0),
-                    ..Default::default()
-                },
-            ).unwrap();
-        }
+        self.debug_display.load("fps".to_owned(), fps.to_string());
 
+        //draw the debug table
+        self.debug_display.render(ctx);
         //draw the player
         if let Err(error) = self.draw_object(ctx, &self.player_mob) {
             return Err(error);

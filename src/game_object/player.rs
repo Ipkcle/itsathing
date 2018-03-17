@@ -51,6 +51,9 @@ impl Player {
     pub fn set_shoot_direction(&mut self, direction: Vector2) {
         self.shoot_direction = direction;
     }
+    pub fn get_health(&self) -> i32 {
+        self.implementation.get_health()
+    }
 }
 
 impl CanShoot for Player {
