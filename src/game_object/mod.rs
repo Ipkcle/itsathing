@@ -57,12 +57,26 @@ pub trait HasHitbox: Object {
     fn get_hitbox(&self) -> &Hitbox;
 }
 
+pub trait HasCollision: HasHitbox {
+    fn get_elasticity(&self) -> f32 {
+        0.0
+    }
+
+    fn recieve_collision(&mut self, _dt: f32, _collision: collision::Collision) {
+        //do nothing
+    }
+}
+
 pub trait HasPhysics: HasHitbox {
     fn get_elasticity(&self) -> f32 {
         0.0
     }
 
     fn recieve_collision(&mut self, _dt: f32, _collision: collision::Collision) {
+        //do nothing
+    }
+
+    fn recieve_collision_events(&mut self, dt: f32, events: Vec<Event>) {
         //do nothing
     }
 }

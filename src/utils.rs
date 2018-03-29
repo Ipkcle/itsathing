@@ -28,3 +28,13 @@ pub fn get_two<T>(data: &mut Vec<T>, i: usize, j: usize) -> Result<(&mut T, &mut
         Ok((a, b))
     }
 }
+
+pub fn get_all<T>(data: &mut Vec<T>) -> Vec<&mut T> {
+    let mut return_vec = Vec::new();
+    unsafe {
+        for i in 0..data.len() {
+            return_vec.push(&mut *(data.get_unchecked_mut(i) as *mut T)); 
+        }
+    }
+    return_vec
+}

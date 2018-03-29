@@ -10,6 +10,7 @@ use game_object::*;
 use game_object::block::Block;
 use game_object::mob::*;
 use game_object::bullet::Bullet;
+use utils::get_all;
 
 mod debug;
 mod input;
@@ -31,6 +32,22 @@ pub struct MainState {
 }
 
 impl MainState {
+
+    fn get_renderable(&mut self) -> Vec<&mut Renderable> {
+        let mut return_vec: Vec<&mut Renderable> = Vec::new();
+        return_vec.push(&mut self.player_mob);
+        for r in get_all(&mut self.blocks) {
+            return_vec.push(r);
+        }
+        for r in get_all(&mut self.mobs) {
+            return_vec.push(r);
+        }
+        for r in get_all(&mut self.projectiles) {
+            return_vec.push(r);
+        }
+        return_vec
+    }
+
     pub fn new(ctx: &mut Context, screen_w: u32, screen_h: u32) -> GameResult<MainState> {
         let mut state = MainState {
             screen_w,

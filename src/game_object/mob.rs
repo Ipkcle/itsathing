@@ -54,6 +54,8 @@ impl<T: IsMob> HasPhysics for T {
     }
 }
 
+impl<T: IsMob> RecievesCollisionEvents for T {}
+
 impl<T: IsMob> Renderable for T {
     fn get_drawable_asset(&self) -> DrawableAsset {
         self.get_mob().get_drawable_asset()

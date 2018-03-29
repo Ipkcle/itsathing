@@ -1,6 +1,8 @@
 use ggez::graphics::Vector2;
 use super::HasHitbox;
 use super::HasPhysics;
+use super::HasCollisionEvents;
+use super::RecievesCollisionEvents;
 use super::Object;
 use utils::get_two;
 
